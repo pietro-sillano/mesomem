@@ -1,0 +1,63 @@
+# mpirun -np 4 lmp_radial -i in.spherical.lmp -v ktilt 12.0 -v ksplay 1.0 -v rcut 2.5 -v wc 2.0
+# lmp -i in.spherical.lmp -v ktilt 12.0 -v ksplay 1.0 -v rcut 2.5 -v wc 2.0
+
+
+variable v_rcut string ${rcut}
+variable v_splay string ${ksplay}
+variable v_tilt string ${ktilt}
+variable v_wc string ${wc}
+
+
+variable t_dump equal 1000
+
+units           lj
+atom_style      hybrid sphere dipole molecular
+neighbor 1.0 bin
+neigh_modify delay 0 every 1 check yes
+
+dimension       3
+boundary        p p p
+
+read_data atom_data_10.9_dist_0.8.lammps # not equilibrated yet
+
+
+#********************************************************************************
+# Various computes
+#********************************************************************************
+compute E_kin_trans all ke
+compute E_kin_rot all erotate/sphere
+compute E_pot all pe
+variable E_tot equal c_E_pot+c_E_kin_trans+c_E_kin_rot
+compute Tall all temp/sphere dof all
+# compute a all temp
+
+
+# Nevery = input values this every timesteps
+# Nrepeat = # of times input values should be read before averaging (usually 1, no averaging)
+# Nfreq = calculate averages every this time step
+fix fix_energies all ave/time 5000 1 5000  v_E_tot c_E_pot c_E_kin_trans c_E_kin_rot file energy.dat
+
+
+thermo_style custom step spcpu cpuremain temp c_Tall c_E_pot c_E_kin_trans c_E_kin_rot v_E_tot press
+thermo ${t_dump}
+
+##############################
+######## PAIR STYLE ##########
+##############################
+
+# global cutoff DEBUG
+pair_style       membrane_sillanov2 2.5
+# i j sigma eps ktilt ksplay rcut wc zeta c0
+pair_coeff       1 1 1.0 1.0 ${v_tilt} ${v_splay} ${v_rcut} ${v_wc} 5.0 0.0
+
+
+
+timestep        0.01
+dump coords all custom ${t_dump} position.lammpstrj id type xu yu zu ix iy iz mux muy muz
+minimize 1.0e-8 1.0e-6 1000 10000
+
+
+fix   f_nve   all    nve/sphere update dipole
+fix   fLANG   all    langevin 0.25 0.25 1.0 321 zero yes omega yes
+
+run 100000

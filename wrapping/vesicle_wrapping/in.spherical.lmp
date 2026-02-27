@@ -1,0 +1,130 @@
+# mpirun -np 4 lmp_radial -i in.spherical.lmp -v ktilt 12.0 -v ksplay 12.0 -v rcut 2.5 -v wc 1.6 -v T 0.2  -v NOUT 12000 -v NIN 10 -v r_initial 10.0
+
+
+variable v_rcut string ${rcut}
+variable v_splay string ${ksplay}
+variable v_tilt string ${ktilt}
+variable v_wc string ${wc}
+variable v_T string ${T}
+
+
+# input args
+variable N_OUT string ${NOUT}
+variable N_IN  string ${NIN}
+variable radius string ${r_initial}
+
+
+variable t_dump equal 1000
+
+units           lj
+atom_style      hybrid sphere dipole molecular
+neighbor 1.0 bin
+neigh_modify delay 0 every 1 check yes
+
+dimension       3
+boundary        p p p
+
+read_data atom_data_10.9_dist_0.8.lammps # not equilibrated yet
+
+group membrane type 1
+
+region out_vesicle sphere 0.0 0.0 0.0 ${radius} side out
+region in_vesicle sphere 0.0 0.0 0.0 ${radius} side in
+
+create_atoms 2 random ${N_OUT} 321 out_vesicle maxtry 10 overlap 1.0
+create_atoms 2 random ${N_IN}  321 in_vesicle  maxtry 10 overlap 1.0
+
+group water type 2
+group out_water_temp region out_vesicle
+group in_water_temp region in_vesicle
+
+group out_water intersect out_water_temp water
+group in_water intersect in_water_temp water
+#
+# velocity in_water  create 0.1 3214 loop geom
+# velocity out_water create 0.1 3214 loop geom
+
+
+
+#********************************************************************************
+# Various computes
+#********************************************************************************
+compute E_kin_trans all ke
+compute E_kin_rot all erotate/sphere
+compute E_pot all pe
+variable E_tot equal c_E_pot+c_E_kin_trans+c_E_kin_rot
+compute Tall all temp/sphere dof all
+# compute a all temp
+
+
+# Nevery = input values this every timesteps
+# Nrepeat = # of times input values should be read before averaging (usually 1, no averaging)
+# Nfreq = calculate averages every this time step
+fix fix_energies all ave/time 5000 1 5000  v_E_tot c_E_pot c_E_kin_trans c_E_kin_rot file energy.dat
+
+
+##############################
+########### MSD ##############
+##############################
+compute msd_all all msd com yes average no
+variable        twopoint equal c_msd_all[4]/4/(step*dt+1.0e-6)
+fix             9 all vector 10 c_msd_all[4]
+variable        fitslope equal slope(f_9)/4/(10*dt)
+
+fix f_msd all ave/time ${t_dump} 1 ${t_dump} c_msd_all[1] c_msd_all[2] c_msd_all[3] c_msd_all[4] v_twopoint v_fitslope file msd.dat mode scalar
+
+##############################
+########### VACF #############
+##############################
+compute         vacf_all all vacf
+fix             temp all vector 1 c_vacf_all[4]
+variable        diff equal dt*trap(f_temp)
+fix vacf_out all ave/time ${t_dump} 1 ${t_dump} c_vacf_all[1] c_vacf_all[2] c_vacf_all[3] c_vacf_all[4] v_diff file vacf.out mode scalar
+
+
+##############################
+########### RDF ##############
+##############################
+compute myRDF all rdf 100 1 1
+fix 1 all ave/time ${t_dump} 1 ${t_dump} c_myRDF[*] file rdf.out mode vector
+
+
+
+thermo_style custom step spcpu cpuremain temp c_Tall c_E_pot c_E_kin_trans c_E_kin_rot v_E_tot press
+thermo ${t_dump}
+
+##############################
+######## PAIR STYLE ##########
+##############################
+
+# global cutoff DEBUG
+pair_style       hybrid membrane_sillano 2.6 lj/cut 2.5
+# i j sigma eps ktilt ksplay rcut weightflag weight_rc
+pair_coeff      1 1 membrane_sillano 1.0 1.0 ${v_tilt} ${v_splay} ${v_rcut} ${v_wc} 5.0
+pair_coeff      2 2 lj/cut 1.0 1.4 1.12    # water-water: full LJ
+pair_coeff      1 2 lj/cut 1.0 1.0 1.12   # water-membrane: only repulsive  ???
+
+# dump coords all custom ${t_dump} position.lammpstrj id type xu yu zu ix iy iz vx vy vz mux muy muz omegax omegay omegaz fx fy fz tqx tqy tqz
+
+
+
+timestep        0.005
+dump coords all custom ${t_dump} position.lammpstrj id type xu yu zu ix iy iz  mux muy muz
+minimize 1.0e-8 1.0e-6 1000 10000
+
+# not trivial to set
+# delete_atoms overlap 2.0 out_water membrane
+# delete_atoms overlap 2.0 in_water membrane
+delete_atoms overlap 1.0 water membrane
+
+
+fix             f_nve membrane nve/sphere update dipole
+fix fLANG   membrane   langevin 0.3 0.3 0.1 321 zero yes omega yes
+
+
+# run 1000
+fix             f_nve_2  water nve
+fix             fLANG2   water langevin 1.0 1.0 1.0 321
+# damp smalller, more viscous
+# fix_modify fLANG temp Tall
+run 100000

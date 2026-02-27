@@ -1,0 +1,132 @@
+
+# mpirun -np 8 lmp_radial -i in.spherical.lmp -v ktilt 15.0 -v ksplay 1.0 -v rcut 2.5 -v wc 2.0 -v NOUT 15000 -v NIN 1000 -v r_initial 10.0
+
+variable v_splay string ${ksplay}
+variable v_tilt string ${ktilt}
+variable v_rcut string ${rcut}
+variable v_wc string ${wc}
+
+
+# input args
+variable SEED string 4323
+
+variable N_OUT string ${NOUT}
+variable N_IN  string ${NIN}
+variable radius string ${r_initial}
+
+
+variable t_dump equal 10000
+
+units           lj
+atom_style      hybrid sphere dipole molecular
+neighbor 1.0 bin
+neigh_modify delay 0 every 1 check yes
+
+dimension       3
+boundary        p p p
+
+# read_data atom_data_23.0_dist_0.85.lammps
+read_data ../atom_data_10.9_dist_0.8.lammps
+
+variable my_diameter equal 4.0
+set      type 1 diameter ${my_diameter}
+variable my_volume equal (4.0/3.0)*PI*((${my_diameter}*0.5)^3)
+# in principle i want to keep my mass fixed for unit conversions! density I dont really care
+variable my_mass equal 1.0
+variable my_density equal ${my_mass}/${my_volume}
+
+set      type 1 density ${my_density}
+print "m:${my_mass} V:${my_volume} rho:${my_density}" file info_mass.dat screen yes
+
+
+group membrane type 1
+
+region out_vesicle sphere 0.0 0.0 0.0 ${radius} side out
+region in_vesicle sphere 0.0 0.0 0.0 ${radius} side in
+
+create_atoms 2 random ${N_OUT} ${SEED} out_vesicle maxtry 10 overlap 1.0
+create_atoms 2 random ${N_IN}  ${SEED} in_vesicle  maxtry 10 overlap 1.0
+
+group water type 2
+group out_water_temp region out_vesicle
+group in_water_temp region in_vesicle
+
+group out_water intersect out_water_temp water
+group in_water intersect in_water_temp water
+
+velocity in_water  create 0.7 ${SEED} loop geom
+velocity out_water create 0.7 ${SEED} loop geom
+
+
+#********************************************************************************
+# 1. Define Temperature Computes (Degrees of Freedom)
+#********************************************************************************
+# Membrane: Sphere style includes Rotation + Translation (5 or 6 DOFs)
+compute T_mem membrane temp/sphere
+
+# Water: Point particles, Translation only (3 DOFs)
+compute T_wat water temp
+
+# Global computes
+compute E_kin_trans all ke
+compute E_kin_rot all erotate/sphere
+compute E_pot all pe
+variable E_tot equal c_E_pot+c_E_kin_trans+c_E_kin_rot
+
+
+#********************************************************************************
+# 2. Logging and Outputs
+#********************************************************************************
+
+# Log energies
+fix fix_energies all ave/time 5000 1 5000 v_E_tot c_E_pot c_E_kin_trans c_E_kin_rot file energy.dat
+
+# Log Temperatures separately
+# Columns: Time step, Temp_Membrane, Temp_Water
+# fix fix_temp_log all ave/time 100 1 100 c_T_mem c_T_wat file temperature_profiles.dat
+
+# Thermo output: Added Pxx Pyy Pzz to monitor isotropy and bulk pressure
+thermo_style custom step spcpu cpuremain c_T_mem c_E_pot press
+thermo ${t_dump}
+
+##############################
+######## PAIR STYLE ##########
+##############################
+
+# global cutoff DEBUG
+pair_style       hybrid membrane_sillanov2 2.5 lj/cut 1.12
+# i j sigma eps ktilt ksplay rcut weightflag
+pair_coeff      1 1 membrane_sillanov2 1.0 1.0 ${v_tilt} ${v_splay} ${v_rcut} ${v_wc} 5.0 0.0
+pair_coeff      2 2 lj/cut 1.0 1.0 1.12    # water-water: full LJ
+pair_coeff      1 2 lj/cut 1.0 1.0  1.12   # water-membrane: only repulsive
+
+delete_atoms overlap 1.0 out_water membrane
+delete_atoms overlap 1.0 in_water membrane
+
+timestep        0.01
+
+#********************************************************************************
+# 3. Integration and Thermostats
+#********************************************************************************
+
+minimize 1.0e-8 1.0e-6 1000 10000
+
+# Main Integrator (NVE) - Updates positions and velocities
+fix f_nve all nve/sphere update dipole
+
+# --- Thermostat 1: Membrane ---
+fix fLangMem membrane langevin 0.2 0.2 1.0 123 zero yes omega yes
+fix_modify fLangMem temp T_mem
+
+# --- Thermostat 2: Water ---
+fix fLangWat water langevin 1.0 1.0 1.0 123 zero yes omega no
+fix_modify fLangWat temp T_wat
+
+#********************************************************************************
+# 4. Dump Trajectory with Stress
+#********************************************************************************
+
+# Included c_atom_stress columns: 1=xx, 2=yy, 3=zz
+dump coords all custom ${t_dump} position.lammpstrj id type xu yu zu ix iy iz mux muy muz
+
+run 250000

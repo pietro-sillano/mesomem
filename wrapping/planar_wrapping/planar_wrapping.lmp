@@ -1,0 +1,118 @@
+# parameter_check: r=radius, sigma_mem=diameter (1.0).
+# usage: mpirun -np 6 lmp_radial -i planar_wrapping.lmp -v ktilt 15 -v ksplay 15 -v rcut 2.5 -v wc 1.6 -v zeta 5.0 -v e 2.0 -v r 2.0
+
+
+# ----------------- Variables & Setup -----------------
+variable        SEED        equal   42069
+variable        sigma_mem   equal   1.0
+variable        r_mem       equal   ${sigma_mem}/2.0
+variable        r_col       string  ${r}    # Colloid Radius
+variable        v_rcut      string  ${rcut}
+variable        v_splay     string  ${ksplay}
+variable        v_tilt      string  ${ktilt}
+variable        v_wc        string  ${wc}
+variable        v_zeta      string  ${zeta}
+
+
+# Physics parameters
+variable        eps_mix     string  ${e}
+variable        sigma_mix   equal   ${r_col}+${r_mem}  # Radius + Radius
+variable        rc_mix      equal   1.12*${sigma_mix}+4.0*${r_mem} # Cutoff # 4 is the same i was using before
+variable        sigma_col   equal   ${r_col}*2.0       # Colloid Diameter
+variable        dist        equal   ${r_col}+3.0
+
+# Path setup
+variable        path        string  single_particle_eps${eps_mix}_r${r_col}
+shell           mkdir       ${path}
+processors      * * 1
+units           lj
+atom_style      hybrid sphere dipole molecular
+boundary        p p p
+neighbor        0.3 bin
+neigh_modify    delay 0 every 1 check yes
+
+# ----------------- Atom Creation -----------------
+# read_data       atom_data_28.8_dist_0.85.lammps
+# read_data       relaxed_system_8000.data
+read_data         input_config/lattice_d_0.90_N_2500
+
+variable my_diameter equal 4.0
+set      type 1 diameter ${my_diameter}
+variable my_volume equal (4.0/3.0)*PI*((${my_diameter}*0.5)^3)
+# in principle i want to keep my mass fixed for unit conversions! density I dont really care
+variable my_mass equal 1.0
+variable my_density equal ${my_mass}/${my_volume}
+
+set      type 1 density ${my_density}
+print "m:${my_mass} V:${my_volume} rho:${my_density}" file info_mass.dat screen yes
+
+
+
+# Create Colloid (Type 2)
+create_atoms    2 single 0.0 0.0 ${dist}
+group           mem     type 1
+group           colloid type 2
+
+# Mass & Velocity Setup
+# corrected mass to density=1.0 approx (4/3*pi*r^3)
+variable        mass_col equal  4/3*3.14*(${r_col}^3)
+mass            2 ${mass_col}
+set             type 2 diameter ${sigma_col}
+
+# Give colloid an initial push downwards?
+variable        vz equal -0.2
+velocity        colloid set 0 0 ${vz}
+
+# ----------------- Interaction Potential -----------------
+pair_style      hybrid membrane_sillanov2 ${rcut} lj/cut 2.5
+
+# 1-1: Membrane-Membrane (Sillano)
+pair_coeff      1 1 membrane_sillanov2 1.0 1.0 ${ktilt} ${ksplay} ${rcut} ${wc} ${zeta} 0.0
+
+# 1-2: Membrane-Colloid (LJ)
+pair_coeff      1 2 lj/cut ${eps_mix} ${sigma_mix} ${rc_mix}
+
+# 2-2: Colloid-Colloid (LJ) - Pure repulsion usually desired, checking sigma
+pair_coeff      2 2 lj/cut 1.0 ${sigma_col}
+pair_modify     shift yes
+
+# ----------------- Computes & Thermo -----------------
+compute         Tall all temp/sphere
+compute         pe_mem mem pe/atom
+compute         pe_colloid colloid pe/atom
+compute         pe_mem_sum mem reduce sum c_pe_mem
+compute         pe_col_sum colloid reduce sum c_pe_colloid
+
+timestep        0.01
+thermo          5000
+thermo_style    custom step spcpu cpuremain c_Tall pe c_pe_mem_sum c_pe_col_sum
+
+# Save thermo data
+fix             f_thermo all ave/time 5000 1 5000 c_Tall c_pe_mem_sum c_pe_col_sum file ${path}/thermo.out
+
+# Dump trajectory
+dump            1 all custom 5000 ${path}/position.lammpstrj id type x y z mux muy muz vx vy vz mass
+
+# ----------------- Run Phase 1: Relax Membrane -----------------
+# Only integrate membrane, keep colloid fixed (frozen)
+# fix nve_lim mem nve/limit 0.01
+fix             nve_mem mem nve/sphere update dipole
+fix             lang_mem mem langevin 0.2 0.2 1.0 ${SEED} zero yes omega yes
+
+minimize 0.0 1.0e-8 1000 100000
+
+#
+run             5000
+# write_data relaxed_system_12500.data
+
+unfix nve_mem
+fix   fNPH_membrane         mem     nph/sphere x 0.0 0.0 100  y 0.0 0.0 100 couple xy drag 1.0 dilate mem nreset 100 update dipole
+
+# ----------------- Run Phase 2: Interaction -----------------
+# Unfix colloid and let it move
+fix             nve_col  colloid nve
+fix             lang_col colloid langevin 0.2 0.2 1.0 ${SEED}
+
+# Reset logs for production
+log             ${path}/production.log
+run             100000

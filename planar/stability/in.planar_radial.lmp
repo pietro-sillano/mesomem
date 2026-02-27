@@ -1,0 +1,112 @@
+# mpirun -np 4 lmp_new -i in.planar.lmp -v ktilt 10.0 -v ksplay 10.0 -v N 2500 -v rcut 3.0 -v wc 3.0 -v zeta 4.0
+
+variable v_rcut string ${rcut}
+variable v_splay string ${ksplay}
+variable v_tilt string ${ktilt}
+variable v_wc string ${wc}
+variable v_N string ${N}
+variable v_T string ${T}
+variable v_zeta string ${zeta}
+variable v_d string ${d}
+
+variable t_dump equal 1000
+
+units           lj
+atom_style      hybrid sphere dipole molecular
+neighbor 1.0 bin
+neigh_modify delay 0 every 1 check yes
+
+dimension       3
+boundary        p p p
+
+
+read_data ../input_config/lattice_d_${v_d}_N_${N}
+
+variable my_diameter equal 4.0
+set      type 1 diameter ${my_diameter}
+variable my_volume equal (4.0/3.0)*PI*((${my_diameter}*0.5)^3)
+# in principle i want to keep my mass fixed for unit conversions! density I dont really care
+variable my_mass equal 1.0
+variable my_density equal ${my_mass}/${my_volume}
+
+set      type 1 density ${my_density}
+print "m:${my_mass} V:${my_volume} rho:${my_density}" file info_mass.dat screen yes
+#*******************************************************************************
+# Various computes
+#*******************************************************************************
+
+compute E_kin_trans all ke
+compute E_kin_rot all erotate/sphere
+compute E_pot all pe
+variable E_tot equal c_E_pot+c_E_kin_trans+c_E_kin_rot
+compute Tall all temp/sphere dof all
+# compute a all temp
+
+
+# Nevery = input values this every timesteps
+# Nrepeat = # of times input values should be read before averaging (usually 1, no averaging)
+# Nfreq = calculate averages every this time step
+fix fix_energies all ave/time 5000 1 5000  v_E_tot c_E_pot c_E_kin_trans c_E_kin_rot file energy.dat
+
+
+##############################
+########### MSD ##############
+##############################
+compute msd_all all msd com no average no
+variable        twopoint equal c_msd_all[4]/4/(step*dt+1.0e-6)
+fix             9 all vector 10 c_msd_all[4]
+variable        fitslope equal slope(f_9)/4/(10*dt)
+
+fix f_msd all ave/time ${t_dump} 1 ${t_dump} c_msd_all[1] c_msd_all[2] c_msd_all[3] c_msd_all[4] v_twopoint v_fitslope file msd.dat mode scalar
+
+##############################
+########### VACF #############
+##############################
+compute         vacf_all all vacf
+fix             temp all vector 1 c_vacf_all[4]
+variable        diff equal dt*trap(f_temp)
+fix vacf_out all ave/time ${t_dump} 1 ${t_dump} c_vacf_all[1] c_vacf_all[2] c_vacf_all[3] c_vacf_all[4] v_diff file vacf.out mode scalar
+
+
+##############################
+########### RDF ##############
+##############################
+compute myRDF all rdf 100 1 1
+fix 1 all ave/time ${t_dump} 1 ${t_dump} c_myRDF[*] file rdf.out mode vector
+
+compute        C_temp_baro all temp
+compute        C_press_baro all pressure C_temp_baro
+
+thermo_style custom step spcpu cpuremain temp c_Tall c_E_pot c_E_kin_trans c_E_kin_rot v_E_tot c_C_press_baro
+thermo ${t_dump}
+
+##############################
+######## PAIR STYLE ##########
+##############################
+
+# global cutoff DEBUG
+pair_style      membrane_sillanov2 ${v_rcut}
+# i j sigma eps ktilt ksplay rcut weightflag weight_rc
+pair_coeff      1 1 1.0 1.0 ${v_tilt} ${v_splay} ${v_rcut} ${v_wc} ${v_zeta} 0.0
+
+# dump coords all custom ${t_dump} position.lammpstrj id type xu yu zu ix iy iz vx vy vz mux muy muz omegax omegay omegaz fx fy fz tqx tqy tqz
+
+dump coords all custom ${t_dump} position.lammpstrj id type xu yu zu ix iy iz  mux muy muz
+
+timestep        0.01
+
+minimize 1.0e-8 1.0e-6 1000 10000
+
+fix             f_nve all nve/sphere update dipole
+# damp smalller, more viscous
+fix fLANG   all   langevin ${v_T} ${v_T} 1.0 24442 zero yes omega yes
+run 10000
+
+unfix f_nve
+
+fix      fNPH_membrane         all     nph/sphere x 0.0 0.0 100.0  y 0.0 0.0 100.0 couple xy drag 5.0 dilate all nreset 100 update dipole
+fix_modify fNPH_membrane temp C_temp_baro press C_press_baro
+
+run 50000
+
+

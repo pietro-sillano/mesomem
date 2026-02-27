@@ -1,0 +1,524 @@
+from collections.abc import Callable
+from dataclasses import dataclass
+from math import nan
+from pathlib import Path
+from typing import cast
+from sklearn.metrics import r2_score
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import scipy.optimize
+import scipy.special
+import xarray as xr
+from equilibration import series2ufloat
+from ovito.data import DataCollection, DataTable
+from ovito.io import import_file
+from ovito.modifiers import (
+    ClearSelectionModifier,
+    ClusterAnalysisModifier,
+    ExpressionSelectionModifier,
+    WrapPeriodicImagesModifier
+)
+from tqdm.auto import tqdm
+from uncertainties import ufloat
+from z2u import zL2u
+
+def modify_clusters(frame: int, data: DataCollection, threshold_count: int = 50):
+    cluster_id, cluster_count = data.tables["clusters"].xy().T
+
+    particle_cluster = data.particles_["Cluster_"]
+
+    big_cluster_count = (cluster_count > threshold_count).sum()
+
+    particle_cluster[:] = np.where(
+        particle_cluster <= big_cluster_count, particle_cluster, 0
+    )
+    data.tables["clusters_"].delete_elements(cluster_id > big_cluster_count)
+
+    particle_mol = np.array(data.particles["Molecule Identifier"])
+    # don't assume all mols are prent
+    mol_u, particle_mol_i = np.unique(particle_mol, return_inverse=True)
+
+    particle_cluster = np.array(data.particles["Cluster"])
+    mol_u_cluster = np.zeros(len(mol_u))
+    particle_type = np.array(data.particles.particle_types)
+
+    def min_cluster_per_mol(mol, cluster, m, c):
+        result = np.full(m, c + 1)
+        np.minimum.at(result, mol, cluster)
+        return result
+
+    sel = particle_type == 2
+    v = min_cluster_per_mol(
+        particle_mol_i[sel],
+        particle_cluster[sel],
+        len(mol_u),
+        big_cluster_count + 1,
+    )
+    sel = v <= big_cluster_count
+    mol_u_cluster[sel] = v[sel]
+
+    particle_cluster = mol_u_cluster[particle_mol_i]
+
+    data.particles_["Cluster_"][:] = particle_cluster
+
+    cluster_id, cluster_count = np.unique(particle_cluster, return_counts=True)
+    del data.tables["clusters"]
+
+    key = "clusters"
+    t = DataTable(title=key)
+    t.x = t.create_property("id", data=cluster_id)
+    t.y = t.create_property("count", data=cluster_count)
+    data.tables[key] = t
+
+
+
+def calc_hfield(filename, n_modes: int = 20, sel=slice(None, None, None)):
+
+    def get_zl(data:DataCollection, N:int):
+        particle_cluster = np.array(data.particles["Cluster"])
+
+        cell = data.cell
+        boxsize = np.array([cell[i, i] for i in range(3)])
+        boxorigin = np.array(cell[:, 3])
+
+        particle_pos = np.array(data.particles["Position"])
+        particle_sel = particle_cluster == 1
+        pos = particle_pos[particle_sel]
+
+        # shape = np.ceil(boxsize[:2] / delta).astype(int)
+        shape = (N, N)
+
+        bins = [
+            np.linspace(boxorigin[i], boxorigin[i] + boxsize[i], num=1 + shape[i])
+            for i in range(2)
+        ]
+        
+        inds = [
+            np.clip(np.digitize(pos[:, i], bins[i]), 1, len(bins[i]) - 1) - 1
+            for i in range(2)
+        ][::-1]
+        IND = np.stack(inds, axis=1)
+
+        pos_z = pos[:, 2]
+
+        zs = np.zeros(shape)
+        # print(IND.shape)
+        np.add.at(zs, tuple(IND.T), pos_z)
+
+        Cs = np.zeros(shape, dtype=int)
+        np.add.at(Cs, tuple(IND.T), 1)
+
+        # assert (~(Cs < 10)).all()
+        # print(Cs)
+        z = np.divide(zs, Cs, out=np.zeros_like(zs), where=Cs != 0)
+        assert not np.isnan(z).any()
+        return z, boxsize[0]
+
+    pipeline = import_file(filename, columns = ["ID", "Particle Type", "Position.X", "Position.Y", "Position.Z", "ix", "iy", "iz","mux","muy","muz"],multiple_frames=True)
+    
+    numFrames = pipeline.source.num_frames
+    
+    pipeline.modifiers.append(ExpressionSelectionModifier(expression="ParticleType==1"))
+
+    pipeline.modifiers.append(
+        ClusterAnalysisModifier(cutoff=1.5, only_selected=True, sort_by_size=True)
+    )
+    pipeline.modifiers.append(ClearSelectionModifier())
+    pipeline.modifiers.append(WrapPeriodicImagesModifier())
+    frame_sel = np.arange(pipeline.num_frames)[sel]
+
+    l = []
+    l_step = []
+    # print(f"Frames selected for spectrum: {frame_sel}")
+    for frame in tqdm(frame_sel):
+        data = pipeline.compute(frame)
+        l_step.append(data.attributes["Timestep"])
+        l.append(get_zl(data, n_modes))
+    Z = np.stack([Z for Z, L in l], axis=0)
+    L = np.stack([L for Z, L in l], axis=0)
+
+    return xr.Dataset(
+        {
+            "z": (("step", "x", "y"), Z),
+            "L": (("step",), L),
+        },
+        coords={"step": np.array(l_step)},
+    )
+
+
+def thermo_2_df_pietro(target: Path):
+    data = np.loadtxt(target)
+    df = pd.DataFrame(data, columns=["step", "f_avg_lx", "f_avg_ly", "f_avg_lz"])
+    df["step"] = df["step"].astype(int)
+    # df = df.set_index("step")
+    return df
+
+def thermo_2_df(target: Path, debug: bool = False):
+    with target.open("rt") as f:
+        _l = 0
+
+        def read_thermo_run(o):
+            nonlocal _l
+            header = next(o).split()
+            _l += 1
+            # strip leading nulls
+            r = []
+            _l2 = []
+            for l in o:
+                _l += 1
+                l = l.strip("\x00")
+                if l.startswith("WARNING") or l.startswith("Fix halt"):
+                    pass
+                else:
+                    if l.startswith("Loop time") or not l:
+                        break
+                    try:
+                        le = [nan if e == "null" else float(e) for e in l.split()]
+                        if not le:
+                            break
+                        r.append(le)
+                        _l2.append(_l)
+                    except:
+                        break
+            df = pd.DataFrame(data=r, columns=header)
+            df["Step"] = df["Step"].astype(int)
+            df = df.rename(columns={"Step": "step"})
+            df = df.set_index("step")
+            if debug:
+                df["line"] = _l2
+            return df
+
+        def find_start(o):
+            nonlocal _l
+            for l in o:
+                _l += 1
+                if l.startswith("Per MPI rank memory"):
+                    return True
+
+            return False
+
+        runs: list[pd.DataFrame] = []
+        for _ in f:
+            _l += 1
+            if find_start(f):
+                x = read_thermo_run(f)
+                if debug:
+                    x["run"] = len(runs)
+                runs.append(x)
+
+        if len(runs) == 0:
+            columns = ["Time", "CPU", "step"]
+            if debug:
+                columns.extend(["line", "run"])
+            df = pd.DataFrame(columns=columns)
+        else:
+            df = pd.concat(runs)
+        df = df.reset_index()
+        return df
+
+
+def div_fill[T: np.ndarray|float](a: T, b: T, fill: float = np.nan) -> T:
+    """a / b, divide by 0 -> `fill`
+    div0( [-1, 0, 1], 0, fill=np.nan) -> [nan nan nan]
+    div0( 1, 0, fill=np.inf ) -> inf
+    """
+    with np.errstate(divide="ignore", invalid="ignore", over="ignore"):
+        c = np.true_divide(a, b)
+    if np.isscalar(c):
+        return c if np.isfinite(c) else fill  # type:ignore
+    else:
+        c[~np.isfinite(c)] = fill
+        return c  # type:ignore
+
+
+@dataclass
+class mlh_res:
+    popt: np.ndarray
+    perr: np.ndarray
+    r2: float
+    Q: float
+    
+
+    @staticmethod
+    def nan_from_p0(p0: np.ndarray):
+        return mlh_res(
+            popt=np.full_like(p0, np.nan), perr=np.full_like(p0, np.nan), r2=np.nan,Q=np.nan
+        )
+
+def mlh(
+    f: Callable,
+    p0: np.ndarray,
+    bounds: tuple[np.ndarray, ...],
+    x: np.ndarray,
+    y: np.ndarray,
+    e: np.ndarray,
+):
+    popt: np.ndarray
+    pcov: np.ndarray
+    e_valid = not (np.isnan(e).all())
+
+    # drop points without error bars
+    if e_valid:
+        sel = np.isfinite(e)
+        x, y, e = x[sel], y[sel], e[sel]
+
+    if len(x) == 0:
+        return mlh_res.nan_from_p0(p0)
+    try:
+        popt, pcov = scipy.optimize.curve_fit(
+            f,
+            x,
+            y,
+            p0=p0,
+            sigma=e if e_valid else None,
+            absolute_sigma=e_valid,
+            bounds=bounds,
+        )[:2]
+    except RuntimeError:
+        return mlh_res.nan_from_p0(p0)
+    pcov_dia: np.ndarray = np.diag(pcov)
+    perr: np.ndarray = np.sqrt(pcov_dia)
+
+    chisq = np.sum(div_fill((y - f(x, *popt)), e) ** 2)
+    N = len(p0)
+    M = len(x)
+    k = M - N
+
+    # Q: float = scipy.special.gammaincc(k / 2, chisq / 2) / scipy.special.gamma(k / 2)
+    Q: float = scipy.special.gammaincc(k / 2, chisq / 2)
+    
+    
+    r2:float = r2_score(y, f(x, *popt))
+    
+    return mlh_res(popt, perr, r2, Q)
+
+
+@dataclass
+class Model_f_u_k:
+    func: Callable = lambda x, k: cast(float, div_fill(0.25, k * x**4, fill=np.nan)) # I think they assume KbT=0.25
+    p0 = np.array(
+        [
+            10,
+        ]
+    )
+    bounds = tuple(np.array([[0.0, np.inf]]).T)
+    def fit(self, x: np.ndarray, y: np.ndarray, e: np.ndarray):
+        return mlh(f=self.func, p0=self.p0, bounds=self.bounds, x=x, y=y, e=e)
+    
+    def fit_res_to_dict(self,res:mlh_res):
+        return {'Q':res.Q}| {
+            k: ufloat(v, e) for k, v, e in zip(["k"], res.popt, res.perr)
+        } | {'r2':res.r2}
+        
+        
+def test_f_u_k():
+    m = 10
+    x = np.logspace(0.1, 1, base=10, num=m)
+    p = (4,)
+    m = Model_f_u_k()
+    y = m.func(x, *p)
+    e = m.func(x * (1 + np.random.default_rng().random(x.shape) * 1e-4), *p) - y
+    r = m.fit(x=x, y=y, e=e)
+    assert np.allclose(np.array([*p]), r.popt) and r.Q > 1e-2, r
+
+
+def fs_fit_df(
+    df: pd.DataFrame,
+    do_plot: bool = False,
+    plot_x_range=(10**-1, 10**0),
+    # fit_x_range=(2 * np.pi / 32, 2 * np.pi / 12),
+    fit_x_range=(0.1,1.0)
+):
+    """_summary_
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        index -> q,v,e
+    ...
+
+    Returns
+    -------
+
+    """
+    if do_plot:
+        plt.xscale("log")
+        plt.yscale("log")
+        plt.xlim(*plot_x_range)  # right = x_max if np.isfinite(x_max) else None)
+
+        plt.axvline(x=fit_x_range[1], color="black", alpha=0.5)
+        plt.axvline(x=fit_x_range[0], color="black", alpha=0.5)
+
+    if "u" in df:
+        x = np.array(df["q"], dtype=float)
+        y, e = np.array([e.n for e in df["u"]], dtype=float), np.array(
+            [e.s for e in df["u"]], dtype=float
+        )
+    else:
+        x, y, e = df.reset_index()[["q", "v", "e"]].to_numpy().T
+
+    if do_plot:
+        plt.errorbar(
+            x=x, y=y, yerr=e, ecolor="black", linestyle="none", marker="o", markersize=1
+        )
+
+    s = (fit_x_range[0] <= x) & (x <= fit_x_range[1])
+    x, y, e = x[s], y[s], e[s]
+
+    m = Model_f_u_k()
+    fit_res = m.fit(x=x, y=y, e=e)
+    fit_res_dict=m.fit_res_to_dict(fit_res)
+
+    if do_plot:
+        x2 = np.logspace(np.log10(fit_x_range[0]), np.log10(fit_x_range[1]))
+        plt.plot(
+            x2,
+            m.func(x2, *fit_res.popt),
+            label="theory",
+            color="grey",
+            alpha=0.5,
+            linestyle="--",
+        )
+
+    if do_plot:
+        plt.legend()
+        plt.xlabel(R"Wavenumber $q / \sigma^{-1}$")
+        plt.ylabel(R"Scaled power $\langle h^2 \rangle L^2 / \sigma^4$")        
+        plt.title(f"K: {fit_res_dict['k']}   Q: {fit_res_dict['Q']:.2g}")
+    return fit_res_dict
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Process a LAMMPS trajectory file.")
+    
+    parser.add_argument(
+        '-p', '--path',
+        required=True,
+        help="The path where to find file and run the analysis"
+    )
+    
+    parser.add_argument(
+        '-f', '--file',
+        default="position.lammpstrj", 
+        help="The name of the LAMMPS trajectory file to process."
+    )
+    
+    parser.add_argument(
+        '-n', '--nmodes',
+        default=50, 
+        help="Number of modes",
+        type=int
+    )
+    
+    parser.add_argument(
+        '--qmin',
+        default=0.1, 
+        help="Min q for fit ",
+        type=float
+    )
+    
+    parser.add_argument(
+        '--qmax',
+        default=0.6, 
+        help="Max q for fit ",
+        type=float
+    )
+    
+    parser.add_argument(
+        '--stride',
+        default=1, 
+        help="Frame stride",
+        type=int
+    )
+    
+    args = parser.parse_args()
+    
+    # args.filename will automatically be the user-provided value or the default
+    path = Path(args.path)
+    filename = Path(args.file)
+    n_modes = args.nmodes
+    qmin = args.qmin
+    qmax = args.qmax
+    stride = args.stride
+    
+    # get average box size from thermo data
+    # df = thermo_2_df(target / "log.lammps")
+    df = thermo_2_df_pietro(path / "boxsize.dat")
+    
+    
+    df["f_avg_lx"] = np.where(df["f_avg_lx"] == 0.0, np.nan, df["f_avg_lx"])
+
+    step_discard = (1e5)
+
+    plt.figure()
+    plt.plot(df["step"] * 1e-2, df["f_avg_lx"])
+    plt.xlabel(R"$\tau$")
+    plt.ylabel(R"$L$")
+    plt.axvline(
+        x=step_discard * 1e-2,
+        linestyle="--",
+        alpha=0.5,
+        label="equilibration threshold",
+    )
+
+    plt.legend()
+    plt.savefig(path / "L.pdf")
+    plt.clf()
+
+    lx_ufloat = series2ufloat(
+        np.array(df[df.step > step_discard].iloc[:-1]["f_avg_lx"])
+    )
+    assert lx_ufloat is not None
+
+    L_avg = lx_ufloat.n
+    print(f"L_avg={lx_ufloat}")
+    
+    # the ratio of this choice is to average the position of 3x3 particles radius square
+    # n_modes_calc_cooke = 2 * (int(L_avg/3) // 2)
+
+    # this one is considering bin for each particle without averaging
+    n_modes_calc = 2 * (int(L_avg) // 2)
+    
+    # this one instead is using the bin size as particle size
+    # n_modes = 50
+    print(f"Modes suggested: {n_modes_calc}")
+
+    # compute height field
+    Z_path = path / f"position.xr"
+    Z = calc_hfield(path / filename, n_modes=n_modes, sel=slice(0, -1, stride))
+    Z.to_netcdf(Z_path)
+    z_ds = (
+        xr.load_dataset(Z_path)
+        .sel(step=slice(step_discard, None))
+        .swap_dims({"step": "time"})
+    )
+    # fourier transform it and average powers
+    u = zL2u(z_ds, L_avg=L_avg)
+    spectrum = (
+        u.to_dataframe()
+        .drop(columns=["nx", "ny"])
+        .rename(columns={"nn": "n"})
+        .reset_index()
+        .sort_values("n")
+    )
+    spectrum.to_csv(path / "spectrum.csv")
+
+    spectrum = spectrum.query("ok")
+
+    # plot and fit
+    model_fit = fs_fit_df(spectrum,fit_x_range=(qmin,qmax),do_plot=True)
+    print("\n".join(f"{k}={v}" for k, v in model_fit.items()))
+    
+    plt.savefig(path / "spectrum.pdf")
+    args_path = path / "report.dat"
+    with args_path.open("a") as f:
+        # # n_modes  qmin  qmax  k  Q
+        f.write(f"{n_modes}  {qmin}  {qmax}  {model_fit['k']:.3f} {model_fit['k']:.3f} {model_fit['Q']:.3g}\n")
+
+
+if __name__ == "__main__":
+    # python fancy_spectrum.py -f position.lammpstrj -p ../baro_adam_long_sampling_rc_3.0_wc2.5 -n 50 --qmin 0.1 --qmax 0.6 --stride 1
+    main()

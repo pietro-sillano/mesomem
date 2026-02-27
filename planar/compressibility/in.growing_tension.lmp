@@ -1,0 +1,141 @@
+# mpirun -np 4 lmp_radial -i in.growing_tension.lmp -v eps 1.0 -v sigma 1.0 -v ktilt 30.0 -v ksplay 30.0 -v rcut 2.5 -v wc 1.6 -v zeta 4.0 -v d 0.85 -v N 400
+
+
+variable v_eps string ${eps}
+variable v_sigma string ${sigma}
+variable v_rcut string ${rcut}
+variable v_tilt string ${ktilt}
+variable v_splay string ${ksplay}
+variable v_wc string ${wc}
+variable v_zeta string ${zeta}
+variable v_T string ${T}
+variable v_N string ${N}
+variable v_d string ${d}
+
+
+variable t_dump equal 1000
+
+units           lj
+atom_style      hybrid sphere dipole molecular
+neighbor 1.0 bin
+neigh_modify delay 0 every 1 check yes
+
+dimension       3
+boundary        p p p
+processors * * 1
+
+
+read_data ../lattice_d_${v_d}_N_${v_N}
+
+variable my_diameter equal 4.0
+set      type 1 diameter ${my_diameter}
+variable my_volume equal (4.0/3.0)*PI*((${my_diameter}*0.5)^3)
+# in principle i want to keep my mass fixed for unit conversions! density I dont really care
+variable my_mass equal 1.0
+variable my_density equal ${my_mass}/${my_volume}
+
+set      type 1 density ${my_density}
+print "m:${my_mass} V:${my_volume} rho:${my_density}" file info_mass.dat screen yes
+
+variable N_atom equal count(all)
+
+#********************************************************************************
+# Various computes
+#********************************************************************************
+compute E_pot all pe
+variable E_pot_each equal c_E_pot/${N_atom}
+compute Tall all temp/sphere dof all
+#
+#
+
+
+
+
+
+fix fix_energies all ave/time ${t_dump} 1 ${t_dump} c_E_pot v_E_pot_each file energy.dat
+
+
+variable area equal lx*ly
+
+
+
+# this is compute pressure I use for setting the barostat
+compute        C_temp_baro all temp/sphere 
+compute        C_press_baro all pressure C_temp_baro
+fix fix_eqn_baro all ave/time ${t_dump} 1 ${t_dump} c_C_press_baro c_C_press_baro[1] c_C_press_baro[2] c_C_press_baro[3] c_C_press_baro[4] c_C_press_baro[5] c_C_press_baro[6] c_C_temp_baro file press_baro.dat
+
+variable lx equal lx
+variable ly equal ly
+variable lz equal lz
+#************************************
+# Custom translation pressure calculation
+#************************************
+compute        peratom_null all stress/atom NULL
+compute        p_null all reduce sum c_peratom_null[1] c_peratom_null[2] c_peratom_null[3] c_peratom_null[4] c_peratom_null[5] c_peratom_null[6]
+variable       V_press_scal_null equal -(c_p_null[1]+c_p_null[2]+c_p_null[3])/(3*vol)
+variable       V_press_vec_null vector -c_p_null/vol
+variable tension equal c_p_null[3]-0.5*(c_p_null[1]+c_p_null[2])
+variable tension_lz equal c_p_null[3]-0.5*(c_p_null[1]+c_p_null[2])*v_lz
+
+
+fix fix_eqn_null all ave/time ${t_dump} 1 ${t_dump} v_V_press_scal_null v_V_press_vec_null[1] v_V_press_vec_null[2] v_V_press_vec_null[3] v_V_press_vec_null[4] v_V_press_vec_null[5] v_V_press_vec_null[6] file custom_press.dat
+
+
+
+# thermo_style custom step spcpu cpuremain temp c_Tall c_E_pot pe
+thermo ${t_dump}
+thermo_style custom step temp cpuremain pe lx ly v_area v_V_press_scal_null c_C_press_baro v_tension v_tension_lz
+#
+# ##############################
+# ######## PAIR STYLE ##########
+# ##############################
+#
+# global cutoff DEBUG
+# pair_style      membrane_new ${v_rcut}
+# # i j sigma eps ktilt ksplay rcut weightflag weight_rc
+# pair_coeff      1 1 ${v_sigma} ${v_eps} ${v_tilt} ${v_splay} ${v_rcut} true ${v_wc} ${v_zeta}
+
+pair_style      membrane_sillanov2 ${v_rcut}
+pair_coeff      1 1 ${v_sigma} ${v_eps} ${v_tilt} ${v_splay} ${v_rcut} ${v_wc} ${v_zeta} 0.0
+
+
+dump coords all custom ${t_dump} position.lammpstrj id type xu yu zu ix iy iz mux muy muz
+
+timestep        0.01
+minimize 1.0e-8 1.0e-6 1000 10000
+
+fix box_size all ave/time 10 100 1000 v_lx v_ly v_lz v_area v_V_press_scal_null c_C_press_baro v_tension v_tension_lz file area.dat
+
+fix             f_nve all nve/sphere update dipole
+fix fLANG   all   langevin ${v_T} ${v_T} 1.0 3452 zero yes omega yes
+
+run 10
+
+
+#********************************************************************************
+# Constant pressure equilibration
+#********************************************************************************
+
+unfix fLANG
+unfix f_nve
+fix fLANG   all   langevin ${v_T} ${v_T} 1.0 32432 zero yes omega yes
+# the Pdamp parameter is the time scale on which pressure is relaxed. For example, a value of 10.0 means to relax the pressure in a timespan of (roughly) 10 time units.
+
+fix      fNPH_membrane         all     nph/sphere x -0.0 -0.0 100.0  y -0.0 -0.0 100.0 couple xy drag 5.0 dilate all nreset 100 update dipole
+fix_modify fNPH_membrane temp C_temp_baro press C_press_baro
+run 100000
+
+unfix fNPH_membrane
+fix      fNPH_membrane         all     nph/sphere x -0.0 -0.15 500.0  y -0.0 -0.15 500.0 couple xy drag 5.0 dilate all nreset 100 update dipole
+fix_modify fNPH_membrane temp C_temp_baro press C_press_baro
+
+
+# The "Golden Ratio" for Thermo Output:
+# If you want to save a data point every 1,000 steps, use these settings:
+# Nevery = 10: Sample the data every 10 steps.
+# Nrepeat = 100: Accumulate 100 of those samples.
+# Nfreq = 1000: Output the average of those 100 samples at step 1000.
+# The averaging window (e.g., 1000 steps) should be short enough that the Area doesn't change significantly during that window, but long enough to smooth out the Virial noise.
+
+
+run 100000
