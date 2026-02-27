@@ -1,10 +1,6 @@
 # New potential for particle based membrane simulations
 This repository contains the new potential for particle based membrane simulations. The potential has been implemented in LAMMPS following the general guidelines for a pair interaction (LAMMPS pair style).
 
-# TODO list
-- [ ] Bridge to Martini model
-- [ ] Extension to transmembrane protein
-- [ ] Implementation on GPU (KOKKOS or OpenMM)
 
 ## Content and structure
 - `Analysis` folder: it contains various python script to perform analysis from the LAMMPS trajectoy files. Some of them are for properties we dont care anymore and others might need some updates, but they form the base for analysis scripts.
