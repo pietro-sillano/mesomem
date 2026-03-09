@@ -4,7 +4,7 @@
 
 **Affiliation:** TU Delft
 
-**Correspondence:** p.sillano@tudelft.nl
+**Correspondence:** t.idema@tudelft.nl, p.sillano@tudelft.nl
 
 **Publication Status:** Available on [ArXiv](https://doi.org/10.48550/arXiv.2602.24123)
 
