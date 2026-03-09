@@ -23,7 +23,7 @@ If you use this model or code in your research, please cite the following:
 
 ```
 
-![image] (/systems/systems.png)
+![image](/systems/systems.png)
 
 ---
 
