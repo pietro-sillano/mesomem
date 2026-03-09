@@ -1,5 +1,6 @@
 # mpirun -np 32 lmp_radial -in in.sphere_benchmark.lmp -v N 50000 -v t_run 5000
 
+
 variable v_N string ${N}
 variable v_t_run string ${t_run}
 

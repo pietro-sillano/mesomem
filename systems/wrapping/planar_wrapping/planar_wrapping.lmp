@@ -1,6 +1,4 @@
-# parameter_check: r=radius, sigma_mem=diameter (1.0).
-# usage: mpirun -np 6 lmp_radial -i planar_wrapping.lmp -v ktilt 15 -v ksplay 15 -v rcut 2.5 -v wc 1.6 -v zeta 5.0 -v e 2.0 -v r 2.0
-
+# mpirun -np 6  lmp_radial -i planar_wrapping.lmp -v N 2000 -v ktilt 15 -v ksplay 1 -v rcut 2.5 -v wc 2.0 -v zeta 5.0 -v e 3.0 -v r 1.0;
 
 # ----------------- Variables & Setup -----------------
 variable        SEED        equal   42069

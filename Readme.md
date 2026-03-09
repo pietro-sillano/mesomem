@@ -1,91 +1,108 @@
-# Code used for MesoMem: A mesoscale membrane model based on an additive potential
+# MesoMem: A mesoscale membrane model based on an additive potential
 
-**Authors:** Pietro Sillano, Timon Idema ...
+**Authors:** Pietro Sillano, Timon Idema, Siewert-Jan Marrink
+
 **Affiliation:** TU Delft
+
 **Correspondence:** p.sillano@tudelft.nl
-**Publication Status:** on Arxiv
 
-The link to the publication can be found here. Please cite the below if you use anything from this repository:
+**Publication Status:** Available on [ArXiv](https://doi.org/10.48550/arXiv.2602.24123)
+
+If you use this model or code in your research, please cite the following:
+
+```bibtex
+@misc{sillano2026mesomemmesoscalemembranemodel,
+      title={MesoMem: A mesoscale membrane model based on an additive potential},
+      author={Pietro Sillano and Siewert-Jan Marrink and Timon Idema},
+      year={2026},
+      eprint={2602.24123},
+      archivePrefix={arXiv},
+      primaryClass={cond-mat.soft},
+      url={https://arxiv.org/abs/2602.24123},
+}
 
 ```
-cite key
-```
+
+![image] (/systems/systems.png)
 
 ---
 
-## Content and structure
-- `Analysis` folder: it contains various python script to perform analysis from the LAMMPS trajectoy files. Some of them are for properties we dont care anymore and others might need some updates, but they form the base for analysis scripts.
+## 📂 Content and Structure
 
-- `benchmarks`: scripts for testing performances.
+* **`Analysis/`**: Python scripts to perform analysis from the LAMMPS trajectoy files, in particular for planar systems.
+* **`lammps_file/`**: C++ source files for the membrane potential (`pair_style membranesillanov2`) and custom pressure compute.
+* **`lammps_input_configuration/`**: Python scripts to generate initial configurations (planar, tubes, and spheres).
+* **`systems/`**: LAMMPS input scripts (`.lmp`) and analysis tools for various physical setups:
+* `planar`: All planar membrane systems.
+* `self_assembly`: Self-assembly simulations from random distributions.
+* `spherical`: Vesicle-related simulations.
+* `volume_control`: Simulations involving osmotic pressure or volume constraints.
+* `wrapping`: Nanoparticle-membrane wrapping studies.
+* **`benchmarks/`**: Scripts for evaluating model performance.
 
-- `lammps_file`: it contains c++ files for membrane potential and for custom pressure compute.
+---
 
-- `lammps_input_configuration`: it  contains the python script to generate plane, tube and spheres initial configurations.
+## How to use the model
 
-- `planar`: flat bilayer simulation.
+### 1. Clone the Repository
 
-- `python_test`: it contains python scripts used for prelimary testing of the potential.
-
-- `self_assembly`:  self assembly simulation.
-
-- `spherical`:  spherical vesicle simulation.
-
-- `tube`:  lipid tube simulation.
-
-- `volume_control`:  volume controlled simulation.
-
-- `wrapping`: particle wrapping simulation.
-
-
-# How to use this repository
-- Download the repository using the TU Delft credentials (netID and password) or set up the ssh authorization keys.
-
-```
-git clone https://gitlab.tudelft.nl/ig-projects/new_potential.git
+```bash
+git clone https://gitlab.tudelft.nl/idema-group/mesomem.git
+cd mesomem
 ```
 
-- you will need python, numpy and matplotlib
-```
-pip install numpy matplotlib
-```
+### 2. LAMMPS Installation
 
-- you will also need LAMMPS https://download.lammps.org/tars/lammps-stable.tar.gz
+This model requires building a custom version of LAMMPS.
 
-
-# LAMMPS building instructions
-1. Download and unpack with
-```
+1. **Download LAMMPS:**
+```bash
 wget --no-check-certificate https://download.lammps.org/tars/lammps-stable.tar.gz
 tar -xvf lammps-stable.tar.gz
-cd lammps-29Aug2024/
+cd lammps-*
+
 ```
 
-2. Move `pair_membrane_sillano_v2.cpp` and `pair_membrane_sillano_v2.h` files from `lammps_file/cpp_files`
- in `src` lammps directory. These files are the new potential and enable the pair_style 'membrane_new' in LAMMPS.
 
-3. Move `compute_pressure.cpp` and `compute_pressure.h` in `src` overwriting the already existing files. This add an additional parameter control in the pressure computing by LAMMPS. Used when we apply a barostat to the simulation.
+2. **Patch Source Files:** Run the provided setup script to move the MesoMem potential and modified pressure computes into the LAMMPS `src` directory.
+```bash
+cp lammps_file/cpp_files/*.{cpp,h} path/to/lammps/src/
+```
 
-4. Install or load required compilation tools
-```
-apt-get install cmake openmpi # if you are using linux/ubuntu/WSL
-```
-```
-module load 2024r1 cmake openmpi # if you are using DelftBlue
-```
-5. Compile
-```
-mkdir build
-cd build
-ccmake  -D BUILD_MPI=yes -D PKG_BROWNIAN=yes -D PKG_MOLFILE=yes -D PKG_EXTRA-PAIR=yes -D PKG_MOLECULE=yes -D PKG_DIPOLE=yes ../cmake
+
+3. **Compile:**
+```bash
+mkdir build && cd build
+cmake -D BUILD_MPI=yes -D PKG_BROWNIAN=yes -D PKG_MOLFILE=yes -D PKG_EXTRA-PAIR=yes -D PKG_MOLECULE=yes -D PKG_DIPOLE=yes ../cmake
 make -j8
-make install
+
 ```
 
-# Self assembly run
-You can run a simple test simulation with `mpirun -np 4 lmp -i self_assembly/self_assembly.lmp -v ktilt 12.0 -v ksplay 1.0 -v N 400 -v rcut 2.5 -v wc 2.0 -v zeta 5.0 -v eps 1.0 -v T 0.2`
 
-Most of simulation produce a `position.lammpstrj` trajectory file that can be visualized with OVITO.
+---
+
+## Running a Simulation
+
+You can test the self-assembly of a vesicle using the following command:
+
+```bash
+mpirun -np 4 lmp -i systems/self_assembly/self_assembly.lmp -v ktilt 12.0 -v ksplay 1.0 -v N 400 -v rcut 2.5 -v wc 2.0 -v zeta 5.0 -v eps 1.0 -v T 0.2
+
+```
+
+### Key Parameters
+
+| Variable | Description | Typical Range |
+| --- | --- | --- |
+| `ktilt` | Bending/Tilt modulus | 10.0 - 20.0 |
+| `ksplay` | Splay modulus | 0.5 - 2.0 |
+| `rcut` | Interaction cutoff distance | 2.5 - 3.0 |
+| `wc` | Orientation cutoff distance | 1.8 - `rcut` |
+
+**Visualization:** Use [OVITO](https://www.ovito.org/) with the `sphere-dipole-molecule` hybrid visualization to view the `position.lammpstrj` output.
+
+---
 
 ## 📄 License
 
-This project is licensed under the [MIT License / CC-BY 4.0] - see the LICENSE file for details.
+This project is licensed under the **MIT License**. See the `LICENSE` file for details.

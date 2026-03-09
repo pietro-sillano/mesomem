@@ -1,4 +1,4 @@
-# mpirun -np 4 lmp_radial -i self_assembly.lmp -v ktilt 12.0 -v ksplay 2.0 -v N 1500 -v rcut 2.5 -v wc 1.8 -v zeta 4.0 -v eps 1.0 -v T 0.2
+# mpirun -np 4 lmp_radial -i self_assembly.lmp -v ktilt 12.0 -v ksplay 2.0 -v N 1500 -v rcut 2.5 -v wc 2.0 -v zeta 5.0 -v eps 1.0 -v T 0.2
 
 
 variable v_rcut string ${rcut}

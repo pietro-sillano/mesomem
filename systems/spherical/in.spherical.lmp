@@ -1,5 +1,5 @@
-# mpirun -np 4 lmp_radial -i in.spherical.lmp -v ktilt 12.0 -v ksplay 1.0 -v rcut 2.5 -v wc 2.0
-# lmp -i in.spherical.lmp -v ktilt 12.0 -v ksplay 1.0 -v rcut 2.5 -v wc 2.0
+# mpirun -np 4 lmp_radial -i in.spherical.lmp -v ktilt 15.0 -v ksplay 1.0 -v rcut 2.5 -v wc 2.0
+
 
 
 variable v_rcut string ${rcut}
