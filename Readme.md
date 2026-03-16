@@ -58,23 +58,21 @@ This model requires building a custom version of LAMMPS.
 ```bash
 wget --no-check-certificate https://download.lammps.org/tars/lammps-stable.tar.gz
 tar -xvf lammps-stable.tar.gz
-cd lammps-*
-
 ```
 
 
 2. **Patch Source Files:** Run the provided setup script to move the MesoMem potential and modified pressure computes into the LAMMPS `src` directory.
 ```bash
-cp lammps_file/cpp_files/*.{cpp,h} path/to/lammps/src/
+cp mesomem/cpp_files/*.{cpp,h} path_to_lammps/src/
 ```
 
 
 3. **Compile:**
 ```bash
+cd path_to_lammps/
 mkdir build && cd build
 cmake -D BUILD_MPI=yes -D PKG_BROWNIAN=yes -D PKG_MOLFILE=yes -D PKG_EXTRA-PAIR=yes -D PKG_MOLECULE=yes -D PKG_DIPOLE=yes ../cmake
 make -j8
-
 ```
 
 
