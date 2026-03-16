@@ -48,7 +48,6 @@ If you use this model or code in your research, please cite the following:
 
 ```bash
 git clone https://gitlab.tudelft.nl/idema-group/mesomem.git
-cd mesomem
 ```
 
 ### 2. LAMMPS Installation
