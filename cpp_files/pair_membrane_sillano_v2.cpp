@@ -59,6 +59,7 @@ PairMembraneSillanov2::PairMembraneSillanov2(LAMMPS *lmp) : Pair(lmp), eps(nullp
 
 PairMembraneSillanov2::~PairMembraneSillanov2()
 {
+  if (copymode) return;
   if (allocated) {
     memory->destroy(setflag);
     memory->destroy(cutsq);
