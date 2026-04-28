@@ -78,7 +78,7 @@ fix fix_energies all ave/time 5000 1 5000  v_E_tot c_E_pot c_E_kin_trans c_E_kin
 ##############################
 
 # global cutoff DEBUG
-pair_style      membrane_sillanov2 ${v_rcut}
+pair_style      mesomem ${v_rcut}
 # i j sigma eps ktilt ksplay rcut weightflag weight_rc
 
 # 0.5 rad -> 30 degrees

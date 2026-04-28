@@ -30,7 +30,7 @@ If you use this model or code in your research, please cite the following:
 ## 📂 Content and Structure
 
 * **`Analysis/`**: Python scripts to perform analysis from the LAMMPS trajectoy files, in particular for planar systems.
-* **`lammps_file/`**: C++ source files for the membrane potential (`pair_style membranesillanov2`) and custom pressure compute.
+* **`lammps_file/`**: C++ source files for the membrane potential (`pair_style mesomem`) and custom pressure compute.
 * **`lammps_input_configuration/`**: Python scripts to generate initial configurations (planar, tubes, and spheres).
 * **`systems/`**: LAMMPS input scripts (`.lmp`) and analysis tools for various physical setups:
 * `planar`: All planar membrane systems.

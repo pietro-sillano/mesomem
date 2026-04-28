@@ -94,9 +94,9 @@ thermo ${t_dump}
 ##############################
 
 # global cutoff DEBUG
-pair_style       hybrid membrane_sillanov2 2.5 lj/cut 1.12
+pair_style       hybrid mesomem 2.5 lj/cut 1.12
 # i j sigma eps ktilt ksplay rcut weightflag
-pair_coeff      1 1 membrane_sillanov2 1.0 1.0 ${v_tilt} ${v_splay} ${v_rcut} ${v_wc} 5.0 0.0
+pair_coeff      1 1 mesomem 1.0 1.0 ${v_tilt} ${v_splay} ${v_rcut} ${v_wc} 5.0 0.0
 pair_coeff      2 2 lj/cut 1.0 1.0 1.12    # water-water: full LJ
 pair_coeff      1 2 lj/cut 1.0 1.0  1.12   # water-membrane: only repulsive
 

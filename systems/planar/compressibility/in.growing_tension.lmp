@@ -95,7 +95,7 @@ thermo_style custom step temp cpuremain pe lx ly v_area v_V_press_scal_null c_C_
 # # i j sigma eps ktilt ksplay rcut weightflag weight_rc
 # pair_coeff      1 1 ${v_sigma} ${v_eps} ${v_tilt} ${v_splay} ${v_rcut} true ${v_wc} ${v_zeta}
 
-pair_style      membrane_sillanov2 ${v_rcut}
+pair_style      mesomem ${v_rcut}
 pair_coeff      1 1 ${v_sigma} ${v_eps} ${v_tilt} ${v_splay} ${v_rcut} ${v_wc} ${v_zeta} 0.0
 
 

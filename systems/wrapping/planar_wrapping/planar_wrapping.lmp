@@ -62,10 +62,10 @@ variable        vz equal -0.2
 velocity        colloid set 0 0 ${vz}
 
 # ----------------- Interaction Potential -----------------
-pair_style      hybrid membrane_sillanov2 ${rcut} lj/cut 2.5
+pair_style      hybrid mesomem ${rcut} lj/cut 2.5
 
 # 1-1: Membrane-Membrane (Sillano)
-pair_coeff      1 1 membrane_sillanov2 1.0 1.0 ${ktilt} ${ksplay} ${rcut} ${wc} ${zeta} 0.0
+pair_coeff      1 1 mesomem 1.0 1.0 ${ktilt} ${ksplay} ${rcut} ${wc} ${zeta} 0.0
 
 # 1-2: Membrane-Colloid (LJ)
 pair_coeff      1 2 lj/cut ${eps_mix} ${sigma_mix} ${rc_mix}

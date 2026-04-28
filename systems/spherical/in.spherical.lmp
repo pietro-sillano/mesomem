@@ -46,7 +46,7 @@ thermo ${t_dump}
 ##############################
 
 # global cutoff DEBUG
-pair_style       membrane_sillanov2 2.5
+pair_style       mesomem 2.5
 # i j sigma eps ktilt ksplay rcut wc zeta c0
 pair_coeff       1 1 1.0 1.0 ${v_tilt} ${v_splay} ${v_rcut} ${v_wc} 5.0 0.0
 
