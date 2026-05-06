@@ -1,4 +1,4 @@
-# MesoMem: A mesoscale membrane model based on an additive potential
+# MesoMem: A Mesoscale Membrane model based on an additive potential
 
 **Authors:** Pietro Sillano, Timon Idema, Siewert-Jan Marrink
 
@@ -63,7 +63,7 @@ tar -xvf lammps-stable.tar.gz
 
 2. **Patch Source Files:** Run the provided setup script to move the MesoMem potential and modified pressure computes into the LAMMPS `src` directory.
 ```bash
-cp mesomem/cpp_files/*.{cpp,h} path_to_lammps/src/
+cp cpp_files/*.{cpp,h} path_to_lammps/src/
 ```
 
 

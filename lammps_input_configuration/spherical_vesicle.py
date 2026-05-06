@@ -1,185 +1,120 @@
+"""
+Spherical Vesicle Generator for LAMMPS
+======================================
+This script generates a spherical vesicle by placing particles at the centers
+of an icosphere's faces. It scales the resulting sphere so that the average
+distance between neighboring particles matches a user-defined target distance.
+
+Output:
+- A LAMMPS data file containing atom positions, types, diameters,
+  densities, charges, and orientation normals.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 from icosphere import icosphere
 from sklearn.neighbors import BallTree
 from scipy.spatial.distance import pdist
 
-def write_positions(path,atom_positions, face_normals, pred_radius):
+def write_positions(path, atom_positions, face_normals, pred_radius):
     """
-    Write the atom positions to a initial configuration LAMMPS data file.
+    Writes particle data to a LAMMPS-compatible data file.
+
+    Format: atom-ID atom-type x y z diameter density q mux muy muz molecule-ID
     """
+    atomtype = 1
+    density = 1.0
+    diameter = 1.0
+    mol_id = 1
+    q = 1.0
 
-    # atom-ID atom-type x y z diameter density q mux muy muz molecule-ID
+    # Define simulation box boundaries based on sphere size (with padding)
+    box_limit = atom_positions.max(0)[0] * 2.0
 
-    atomtype = 1 # atom type
-    # density = 1.0 / (4.0/3.0*np.pi)
-    density = 1.0 # density of the particles
-    diameter = 1.0 # diameter of the particles
-    mol_id = 1 # molecule ID
-    q = 1.0 # charge
-    lammps_data = f"""\
-    Radius equal to {pred_radius:.6f}
+    header = f"""\
+Generated Spherical Vesicle
+Radius approximately {pred_radius:.6f}
 
-    {len(atom_positions)} atoms
+{len(atom_positions)} atoms
+1 atom types
 
-    1 atom types
+{-box_limit:.6f} {box_limit:.6f} xlo xhi
+{-box_limit:.6f} {box_limit:.6f} ylo yhi
+{-box_limit:.6f} {box_limit:.6f} zlo zhi
 
-    {- atom_positions.max(0)[0]*2.0:.6f} {atom_positions.max(0)[0]*2.0:.6f} xlo xhi
-    {- atom_positions.max(0)[1]*2.0:.6f} {atom_positions.max(0)[1]*2.0:.6f} ylo yhi
-    {- atom_positions.max(0)[2]*2.0:.6f} {atom_positions.max(0)[2]*2.0:.6f} zlo zhi
+Atoms
+"""
 
-
-    Atoms \n
-    """
-    # atom-ID atom-type x y z diameter density q mux muy muz molecule-ID
-
-    # Append atom positions and normals for orientations to the LAMMPS data
+    # Build the atom list: includes position and orientation (face normals)
+    lines = []
     for i in range(atom_positions.shape[0]):
-        atom_id = i + 1  # LAMMPS atom IDs start from 1
-        lammps_data += f"{atom_id} {atomtype} {atom_positions[i,0]:.6f} {atom_positions[i,1]:.6f} {atom_positions[i,2]:.6f} {diameter} {density} {q} {face_normals[i,0]} {face_normals[i,1]} {face_normals[i,2]} {mol_id}\n"
+        atom_id = i + 1
+        x, y, z = atom_positions[i]
+        nx, ny, nz = face_normals[i]
+        lines.append(f"{atom_id} {atomtype} {x:.6f} {y:.6f} {z:.6f} {diameter} {density} {q} {nx} {ny} {nz} {mol_id}")
 
-    # Write the LAMMPS data to a file
-    with open(f"{path}/atom_data_{pred_radius:.1f}_dist_{target_dist}.lammps", "w") as file:
-        file.write(lammps_data)
+    # Save to file
+    filename = f"{path}/atom_data_R{pred_radius:.1f}_dist_{target_dist}.lammps"
+    with open(filename, "w") as file:
+        file.write(header + "\n".join(lines))
 
-    print(f"LAMMPS data file 'atom_data_{pred_radius:.1f}_dist_{target_dist}.lammps' has been generated.")
+    print(f"Success: Generated '{filename}'")
 
+# --- Configuration ---
 NOISE = False
-path = '.' # current directory
+path = '.'
+target_dist = 0.8  # Desired equilibrium distance between particles
 
-# python spherical_vesicle.py
+# --- User Input & Estimation ---
+print("Vesicle Generator")
+print("Choose an iteration value (nu) to determine particle count:")
 
+# Print a lookup table for the user
+for nu_val in np.arange(5, 30, 5):
+    nr_face = 20 * (nu_val**2)  # Number of faces = number of particles
+    print(f"  Iteration: {nu_val:2} | Particles: {nr_face:5} | Estimated Radius: {nu_val / 1.1:.1f}")
 
-print("Choose the iteration value according to the sphere size or number of particles to generate")
-print("The following values are an example:")
+nu = int(input("\nEnter iteration number (nu): "))
 
-for nu in np.arange(5, 30, 5):
-    nr_vertex = 12 + 10 * (nu**2 - 1)
-    nr_face = 20 * nu**2
-    print(f"Iteration: {nu}, N particles: {nr_face}, pred radius: {nu / 1.1:.1f}")
-
-
-nu = int(input("Iteration number: "))
-
+# --- Geometry Generation ---
+# 1. Generate icosphere mesh
 vertices, faces = icosphere(nu)
 triangles = vertices[faces]
 
-if NOISE:
-    triangles[:,0] = triangles[:,0] + 0.3 * np.random.randn()
-    triangles[:,1] = triangles[:,1] + 0.3 * np.random.randn()
-    triangles[:,2] = triangles[:,2] + 0.3 * np.random.randn()
-
-
-# calculate face normals
-face_normals = np.cross(vertices[faces[:, 1]]-vertices[faces[:, 0]],
-                        vertices[faces[:, 2]]-vertices[faces[:, 0]])
+# 2. Calculate Face Normals (Orientation vectors for each particle)
+face_normals = np.cross(vertices[faces[:, 1]] - vertices[faces[:, 0]],
+                        vertices[faces[:, 2]] - vertices[faces[:, 0]])
+# Normalize vectors to unit length
 face_normals /= np.sqrt(np.sum(face_normals**2, axis=1, keepdims=True))
 
-# calculate the center of mass of the triangles
-cm = (triangles[:, 0, :] + triangles[:, 1, :] + triangles[:, 2, :]) / 3
-vertices = cm  # Use the center of mass of the triangle as position for the particle
+# 3. Place particles at the Center of Mass (CM) of each triangle face
+face_centers = (triangles[:, 0, :] + triangles[:, 1, :] + triangles[:, 2, :]) / 3
 
-# calculate the mean distance between the particles
-tree = BallTree(vertices)
-dist_neighbours, index = tree.query(vertices, k=6)
-# np.mean(dist_neighbours[0], axis=1)
-mean_dist = np.mean(dist_neighbours)
-print(f"Mean dist: {mean_dist}")
+# --- Scaling Logic ---
+# Calculate current mean distance between neighboring face centers
+tree = BallTree(face_centers)
+dist_neighbors, _ = tree.query(face_centers, k=6) # Check 6 nearest neighbors
+mean_dist = np.mean(dist_neighbors[:, 1:]) # Exclude distance to self (index 0)
 
-cm_sphere = np.mean(vertices,axis=0)
-print(f"Center of mass of the sphere",cm_sphere)
-# scale the particles to the target distance, this is something that can be adjusted according to the model
-# 0.8 works for Yuan's model
-target_dist = 0.8
-
-
-
+# Scale vertices so the mean distance equals target_dist
 scale_factor = target_dist / mean_dist
-print(f"Scale factor: {scale_factor}")
+scaled_vertices = face_centers * scale_factor
 
-new_vertices = vertices * scale_factor
+print(f"Mean neighbor distance (pre-scale): {mean_dist:.4f}")
+print(f"Scale factor applied: {scale_factor:.4f}")
 
-cm_sphere = np.mean(new_vertices,axis=0)
-print(f"Center of mass of the sphere",cm_sphere)
-tree = BallTree(new_vertices)
-dist_neighbours, index = tree.query(new_vertices, k=6)
-mean_dist = np.mean(dist_neighbours)
-print(f"Mean dist: {mean_dist}")
-
-
-plt.plot(vertices[:, 0], vertices[:, 1], 'bo')
-plt.plot(new_vertices[:, 0], new_vertices[:, 1], 'ro')
+# --- Visualization & Final Stats ---
+plt.figure(figsize=(6,6))
+plt.plot(face_centers[:, 0], face_centers[:, 1], 'bo', label='Original', alpha=0.5)
+plt.plot(scaled_vertices[:, 0], scaled_vertices[:, 1], 'ro', label='Scaled', alpha=0.5)
+plt.legend()
+plt.title("Vesicle Cross-section (XY Plane)")
 plt.axis('equal')
 plt.show()
 
+# Calculate final radius using the max distance between any two particles
+final_radius = np.max(pdist(scaled_vertices, metric='euclidean')) / 2.0
+print(f"Final calculated radius: {final_radius:.4f}")
 
-pred_radius = np.max(pdist(vertices, metric='euclidean')) / 2.0
-print(f"Old sphere radius: {pred_radius}")
-
-vertices = new_vertices
-
-
-pred_radius = np.max(pdist(vertices, metric='euclidean')) / 2.0
-print(f"New scaled radius: {pred_radius}")
-
-write_positions(path,vertices, face_normals, pred_radius)
-
-# render_curvature_pv(vertices)
-
-
-###########################################################
-# The following part is to generate spheres with a for loop sequence, if you need to generate a bunch of them ########
-###########################################################
-
-# radius_list = []
-# nu_list = np.arange(40, 60, 5)
-# factor_list = []
-
-# for nu in nu_list:
-#     print(nu)
-#     vertices, faces = icosphere(nu)
-#     triangles = vertices[faces]
-
-#     face_normals = np.cross(vertices[faces[:, 1]]-vertices[faces[:, 0]],
-#                             vertices[faces[:, 2]]-vertices[faces[:, 0]])
-#     face_normals /= np.sqrt(np.sum(face_normals**2, axis=1, keepdims=True))
-
-#     cm = triangles[:, 0, :] + triangles[:, 1, :] + triangles[:, 2, :] / 3
-#     vertices = cm  # uso il cm del triangle come posizione per la particle
-
-
-#     tree = BallTree(vertices)
-#     dist_neighbours, index = tree.query(vertices, k=6)
-#     # np.mean(dist_neighbours[0], axis=1)
-#     mean_dist = np.mean(dist_neighbours)
-#     target_dist = 0.8
-
-#     scale_factor = target_dist / mean_dist
-#     print(f"Scale factor: {scale_factor}")
-
-#     new_vertices = vertices * scale_factor
-#     factor_list.append(scale_factor)
-
-#     vertices = new_vertices
-
-
-
-#     pred_radius = np.max(pdist(vertices, metric='euclidean')) / 2.0
-#     print(f"Radius: {pred_radius}")
-#     radius_list.append(pred_radius)
-
-
-#     write_positions(path,vertices, face_normals, pred_radius)
-
-
-# plt.plot(nu_list,radius_list,'bo')
-# plt.plot(nu_list,nu_list,'k--')
-# plt.show()
-
-
-# plt.plot(nu_list,factor_list,'bo')
-# plt.show()
-
-
-# plt.plot(radius_list,factor_list,'bo')
-# plt.show()
+# Save the LAMMPS file
+write_positions(path, scaled_vertices, face_normals, final_radius)
