@@ -73,6 +73,7 @@ cd path_to_lammps/
 mkdir build && cd build
 cmake -D BUILD_MPI=yes -D PKG_BROWNIAN=yes -D PKG_MOLFILE=yes -D PKG_EXTRA-PAIR=yes -D PKG_MOLECULE=yes -D PKG_DIPOLE=yes ../cmake
 make -j8
+make install # optional
 ```
 
 
