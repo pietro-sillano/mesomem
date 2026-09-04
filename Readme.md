@@ -1,6 +1,6 @@
 # MesoMem: A Mesoscale Membrane model based on an additive potential
 
-**Authors:** Pietro Sillano, Timon Idema, Siewert-Jan Marrink
+**Authors:** Pietro Sillano, Siewert-Jan Marrink, Timon Idema
 
 **Affiliation:** TU Delft
 
