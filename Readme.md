@@ -1,26 +1,30 @@
 # MesoMem: A Mesoscale Membrane model based on an additive potential
 
-**Authors:** Pietro Sillano, Siewert-Jan Marrink, Timon Idema
+**Authors:** Pietro Sillano, Siewert J. Marrink, Timon Idema
 
 **Affiliation:** TU Delft
 
 **Correspondence:** t.idema@tudelft.nl, p.sillano@tudelft.nl
 
-**Publication Status:** Available on [ArXiv](https://doi.org/10.48550/arXiv.2602.24123)
+**Publication:** [Phys. Rev. E **114**, 034412 (2026)](https://doi.org/10.1103/4dhv-8xd7) · preprint on [arXiv](https://arxiv.org/abs/2602.24123)
 
 If you use this model or code in your research, please cite the following:
 
 ```bibtex
-@misc{sillano2026mesomemmesoscalemembranemodel,
-      title={MesoMem: A mesoscale membrane model based on an additive potential},
-      author={Pietro Sillano and Siewert-Jan Marrink and Timon Idema},
-      year={2026},
-      eprint={2602.24123},
-      archivePrefix={arXiv},
-      primaryClass={cond-mat.soft},
-      url={https://arxiv.org/abs/2602.24123},
+@article{4dhv-8xd7,
+  title = {MesoMem: A mesoscale membrane model based on an additive potential},
+  author = {Sillano, Pietro and Marrink, Siewert J. and Idema, Timon},
+  journal = {Phys. Rev. E},
+  volume = {114},
+  issue = {3},
+  pages = {034412},
+  numpages = {11},
+  year = {2026},
+  month = {Sep},
+  publisher = {American Physical Society},
+  doi = {10.1103/4dhv-8xd7},
+  url = {https://link.aps.org/doi/10.1103/4dhv-8xd7}
 }
-
 ```
 
 ![image](/systems/systems.png)
