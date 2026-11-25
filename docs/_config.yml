@@ -23,4 +23,4 @@ defaults:
       layout: default
 
 # Look of the interactive membrane on the home page: line or bilayer
-membrane_style: line
+membrane_style: bilayer
