@@ -1,0 +1,4 @@
+<li class="row">
+  <span class="row-meta"><span class="date">{{ include.pub.year }}</span><span class="tag tag-{{ include.pub.type | downcase }}">{{ include.pub.type }}</span></span>
+  <span class="row-body"><span class="pub-title">{{ include.pub.title }}.</span> {{ include.pub.authors }}. {{ include.pub.venue | markdownify | remove: '<p>' | remove: '</p>' | strip }}.{% for link in include.pub.links %}{% if forloop.first %} {% else %} · {% endif %}<a href="{{ link.url }}">{{ link.label }}</a>{% endfor %}</span>
+</li>

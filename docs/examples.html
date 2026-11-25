@@ -1,0 +1,53 @@
+---
+title: Examples
+nav: examples
+permalink: /examples/
+---
+<section class="block">
+  <h2 class="label">Run an example</h2>
+  <p>MesoMem ships with LAMMPS as <a href="https://docs.lammps.org/pair_mesomem_dipole.html"><code>pair_style mesomem/dipole</code></a> in the DIPOLE package, with OpenMP and Kokkos (GPU) versions. No custom build is needed. Run the inputs from the <a href="https://github.com/pietro-sillano/mesomem/tree/main/examples">examples</a> folder, since each one reads its data file from there:</p>
+  <pre><code>cd examples
+mpirun -np 4 lmp -in in.planar</code></pre>
+</section>
+
+<section class="block">
+  <h2 class="label">Inputs</h2>
+  <ul class="rows">
+    <li class="row">
+      <a class="row-file" href="https://github.com/pietro-sillano/mesomem/blob/main/examples/in.planar">in.planar</a>
+      <span class="row-body muted">Flat membrane of 2125 particles across the periodic box. After equilibration at constant area, a barostat relaxes it to zero tension. Reports the projected area.</span>
+    </li>
+    <li class="row">
+      <a class="row-file" href="https://github.com/pietro-sillano/mesomem/blob/main/examples/in.vesicle">in.vesicle</a>
+      <span class="row-body muted">Spherical vesicle of 2000 particles with radius 10.88. Reports the radius of gyration.</span>
+    </li>
+    <li class="row">
+      <a class="row-file" href="https://github.com/pietro-sillano/mesomem/blob/main/examples/in.selfassembly">in.selfassembly</a>
+      <span class="row-body muted">1500 particles that grow from small aggregates into flat membrane patches. Reports the number of clusters, the largest cluster and free particles. Same files as in the LAMMPS distribution.</span>
+    </li>
+  </ul>
+</section>
+
+<section class="block">
+  <h2 class="label">Parameters</h2>
+  <p>Each input sets the model parameters as <code>index</code> variables at the top. Override them from the command line:</p>
+  <pre><code>lmp -in in.vesicle -var ktilt 12.0 -var T 0.25</code></pre>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th scope="col">Variable</th><th scope="col">Meaning</th><th scope="col" class="num">Default</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>eps</code></td><td>Depth of the isotropic potential minimum</td><td class="num">1.0</td></tr>
+        <tr><td><code>rcut</code></td><td>Cutoff of the isotropic potential</td><td class="num">2.5</td></tr>
+        <tr><td><code>ktilt</code></td><td>Tilt stiffness</td><td class="num">15.0</td></tr>
+        <tr><td><code>ksplay</code></td><td>Splay stiffness</td><td class="num">1.0</td></tr>
+        <tr><td><code>wc</code></td><td>Cutoff of the tilt and splay energies (<code>wc</code> ≤ <code>rcut</code>)</td><td class="num">2.0</td></tr>
+        <tr><td><code>zeta</code></td><td>Width of the attractive branch; sets the in-plane diffusivity</td><td class="num">5.0</td></tr>
+        <tr><td><code>c0</code></td><td>Spontaneous curvature</td><td class="num">0.0</td></tr>
+        <tr><td><code>T</code></td><td>Temperature of the Langevin thermostat</td><td class="num">0.2</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="small muted">To write a trajectory, uncomment the <code>dump</code> lines in an input. View it in <a href="https://www.ovito.org/">OVITO</a>, showing the dipoles as membrane normals.</p>
+</section>

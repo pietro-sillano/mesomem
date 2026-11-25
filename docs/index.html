@@ -1,0 +1,15 @@
+---
+nav: news
+membrane: true
+---
+<section class="block">
+  <h2 class="label">News</h2>
+  <ul class="rows">
+    {%- for item in site.data.news %}
+    <li class="row">
+      <span class="row-meta"><span class="date">{{ item.date }}</span><span class="tag tag-{{ item.type | downcase }}">{{ item.type }}</span></span>
+      <span class="row-body">{{ item.text | markdownify | remove: '<p>' | remove: '</p>' | strip }}</span>
+    </li>
+    {%- endfor %}
+  </ul>
+</section>

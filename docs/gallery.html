@@ -1,0 +1,24 @@
+---
+title: Gallery
+nav: gallery
+permalink: /gallery/
+---
+<section class="block">
+  <h2 class="label">Gallery</h2>
+  {%- if site.data.gallery.size > 0 %}
+  <div class="gallery">
+    {%- for item in site.data.gallery %}
+    <figure{% if item.wide %} class="wide"{% endif %}>
+      <img src="{{ '/assets/gallery/' | append: item.image | relative_url }}" alt="{{ item.alt }}" loading="lazy">
+      {%- if item.caption %}
+      <figcaption>{{ item.caption | markdownify | remove: '<p>' | remove: '</p>' | strip }}</figcaption>
+      {%- endif %}
+    </figure>
+    {%- endfor %}
+  </div>
+  {%- else %}
+  <div class="placeholder">
+    <p>Images and movies made with MesoMem will appear here.<br>Made one? Contact us and we will add it.</p>
+  </div>
+  {%- endif %}
+</section>

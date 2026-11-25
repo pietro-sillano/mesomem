@@ -1,0 +1,18 @@
+# News shown on the home page, newest first.
+#
+# Add an item at the top of the list:
+#   - date: "Mar 2027"
+#     type: Release          # Release, Paper, Preprint, Talk, ... (Release, Paper and Preprint have their own colour)
+#     text: "One sentence in Markdown. [Link text](https://example.org)"
+
+- date: "Nov 2026"
+  type: Release
+  text: "MesoMem is part of LAMMPS as `pair_style mesomem/dipole`, with OpenMP and Kokkos versions. [Docs](https://docs.lammps.org/pair_mesomem_dipole.html)"
+
+- date: "Sep 2026"
+  type: Paper
+  text: "Published in *Physical Review E* **114**, 034412. [Read](https://doi.org/10.1103/4dhv-8xd7)"
+
+- date: "Feb 2026"
+  type: Preprint
+  text: "Preprint on arXiv. [2602.24123](https://arxiv.org/abs/2602.24123)"

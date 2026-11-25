@@ -1,0 +1,9 @@
+# Gallery page. While this list is empty, the page shows a placeholder.
+#
+# Put image files in docs/assets/gallery/ and add an entry:
+#   - image: vesicle.png                 # file name inside docs/assets/gallery/
+#     alt: "Short description of what the image shows"
+#     caption: "Caption in Markdown."
+#     wide: true                          # optional: span the full width
+
+[]

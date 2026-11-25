@@ -1,0 +1,23 @@
+title: MesoMem
+tagline: Mesoscale membrane model
+description: >-
+  MesoMem is a solvent-free, one-particle-thick coarse-grained model of fluid
+  lipid membranes, implemented in LAMMPS as pair_style mesomem/dipole.
+
+# Served from the docs/ folder of github.com/pietro-sillano/mesomem
+url: "https://pietro-sillano.github.io"
+baseurl: "/mesomem"
+
+markdown: kramdown
+
+exclude:
+  - README.md
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default

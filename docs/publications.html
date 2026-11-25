@@ -1,0 +1,26 @@
+---
+title: Publications
+nav: publications
+permalink: /publications/
+---
+<section class="block">
+  <h2 class="label">The MesoMem paper</h2>
+  <ul class="rows">
+    {%- for pub in site.data.publications.mesomem %}
+    {% include publication.html pub=pub %}
+    {%- endfor %}
+  </ul>
+</section>
+
+<section class="block">
+  <h2 class="label">Work using MesoMem</h2>
+  {%- if site.data.publications.using.size > 0 %}
+  <ul class="rows">
+    {%- for pub in site.data.publications.using %}
+    {% include publication.html pub=pub %}
+    {%- endfor %}
+  </ul>
+  {%- else %}
+  <p class="note">Papers, preprints and theses that use the model will be listed here. Used MesoMem in your work? Contact us and we will add it here!</p>
+  {%- endif %}
+</section>

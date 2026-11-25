@@ -1,0 +1,9 @@
+{%- assign tabs = "news:/|publications:/publications/|gallery:/gallery/|examples:/examples/" | split: "|" -%}
+<nav class="tabs" aria-label="Site">
+  {%- for tab in tabs -%}
+    {%- assign parts = tab | split: ":" -%}
+    {%- assign id = parts[0] -%}
+    {%- assign path = parts[1] -%}
+    <a href="{{ path | relative_url }}"{% if page.nav == id %} aria-current="page"{% endif %}>{{ id | capitalize }}</a>
+  {%- endfor -%}
+</nav>
