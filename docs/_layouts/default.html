@@ -23,7 +23,8 @@
 
       {% if page.membrane %}
       <div class="membrane">
-        <canvas id="membrane" role="img" aria-label="Animated cross-section of a MesoMem membrane: a row of oriented particles that bends around the cursor"></canvas>
+        <canvas id="membrane" data-variant="{{ site.membrane_style | default: 'line' }}" role="img" aria-label="Animated cross-section of a MesoMem membrane: a row of oriented particles that bends around the cursor"></canvas>
+        <span class="membrane-note">2D representation</span>
       </div>
       {% endif %}
 
