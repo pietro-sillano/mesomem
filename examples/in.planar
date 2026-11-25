@@ -1,0 +1,76 @@
+# Tensionless flat membrane with pair style mesomem/dipole.  The dipole
+# vector of each particle represents the local membrane normal.  See:
+# P. Sillano, S. J. Marrink, T. Idema, Phys. Rev. E 114, 034412 (2026).
+#
+# The initial configuration in data.planar is a flat patch of 2125
+# particles on a lattice in the z = 0 plane with all normals along +z.
+# The patch spans the periodic box in x and y.  After a short energy
+# minimization the membrane is equilibrated at constant area with a
+# Langevin thermostat.  It is then coupled to a barostat that acts on
+# x and y only, with zero target pressure, so the membrane relaxes to its
+# tensionless area.  This is monitored with the projected area (lx*ly) in
+# the thermo output.  The membrane undulates out of plane, which can be
+# used to measure the bending rigidity from the height fluctuation spectrum.
+
+variable eps    index 1.0
+variable rcut   index 2.5
+variable ktilt  index 15.0
+variable ksplay index 1.0
+variable wc     index 2.0
+variable zeta   index 5.0
+variable c0     index 0.0
+variable T      index 0.2
+
+units           lj
+atom_style      hybrid sphere dipole
+
+# the particles have diameter 4.0 and mass 1.0 (set via diameter and density
+# in the data file). This increases their moment of inertia and stabilizes the
+# rotational dynamics.  The diameter does not enter the pair interaction.
+
+pair_style      mesomem/dipole
+read_data       data.planar
+
+#               i j sigma eps    ktilt    ksplay    r_c     w_c   zeta    C0
+pair_coeff      1 1 1.0   ${eps} ${ktilt} ${ksplay} ${rcut} ${wc} ${zeta} ${c0}
+
+neighbor        1.0 bin
+neigh_modify    delay 0 every 1 check yes
+
+# temperature including the rotational degrees of freedom
+compute         Tall all temp/sphere dof all
+
+# translational temperature and pressure used by the barostat
+compute         Ttrans all temp
+compute         Ptrans all pressure Ttrans
+
+# projected membrane area
+variable        area equal lx*ly
+
+thermo_style    custom step temp c_Tall pe press pxx pyy v_area
+thermo_modify   colname c_Tall T_sphere colname v_area Area
+thermo          500
+
+# uncomment to write snapshot images and/or a trajectory for visualization
+#dump            img all image 1000 image.*.png type type adiam 1.0 &
+#                view 60 30 zoom 1.4 ssao yes 4539 0.6 box yes 0.01
+#dump_modify     img pad 6
+#dump            traj all custom 1000 planar.lammpstrj id type x y z mux muy muz
+
+minimize        1.0e-8 1.0e-6 1000 10000
+
+timestep        0.01
+fix             integrate all nve/sphere update dipole
+fix             thermostat all langevin ${T} ${T} 1.0 24442 zero yes omega yes
+fix_modify      thermostat temp Tall
+
+# equilibration at constant area
+run             5000
+
+# tensionless membrane: zero lateral pressure, z dimension stays fixed
+unfix           integrate
+fix             barostat all nph/sphere x 0.0 0.0 100.0 y 0.0 0.0 100.0 &
+                couple xy drag 5.0 dilate all update dipole
+fix_modify      barostat temp Ttrans press Ptrans
+
+run             10000

@@ -1,0 +1,62 @@
+# Spherical vesicle with pair style mesomem/dipole.  The dipole vector of
+# each particle represents the local membrane normal.  See:
+# P. Sillano, S. J. Marrink, T. Idema, Phys. Rev. E 114, 034412 (2026).
+#
+# The initial configuration in data.vesicle consists of 2000 particles
+# placed on a sphere of radius 10.88 with their normals pointing outward.
+# The box is large enough that the vesicle does not interact with its
+# periodic images.  After a short energy minimization the vesicle is
+# equilibrated with a Langevin thermostat.  The membrane is fluid, so the
+# particles diffuse over the surface while the vesicle keeps its closed
+# shape.  This is monitored with the radius of gyration in the thermo
+# output, which stays close to the initial radius.
+
+variable eps    index 1.0
+variable rcut   index 2.5
+variable ktilt  index 15.0
+variable ksplay index 1.0
+variable wc     index 2.0
+variable zeta   index 5.0
+variable c0     index 0.0
+variable T      index 0.2
+
+units           lj
+atom_style      hybrid sphere dipole
+
+# the particles have diameter 4.0 and mass 1.0 (set via diameter and density
+# in the data file). This increases their moment of inertia and stabilizes the
+# rotational dynamics.  The diameter does not enter the pair interaction.
+
+pair_style      mesomem/dipole
+read_data       data.vesicle
+
+#               i j sigma eps    ktilt    ksplay    r_c     w_c   zeta    C0
+pair_coeff      1 1 1.0   ${eps} ${ktilt} ${ksplay} ${rcut} ${wc} ${zeta} ${c0}
+
+neighbor        1.0 bin
+neigh_modify    delay 0 every 1 check yes
+
+# temperature including the rotational degrees of freedom
+compute         Tall all temp/sphere dof all
+
+# radius of gyration of the vesicle
+compute         rg all gyration
+
+thermo_style    custom step temp c_Tall pe press c_rg
+thermo_modify   colname c_Tall T_sphere colname c_rg Rg
+thermo          500
+
+# uncomment to write snapshot images and/or a trajectory for visualization
+#dump            img all image 1000 image.*.png type type adiam 1.0 &
+#                view 60 30 zoom 1.4 ssao yes 4539 0.6 box yes 0.01
+#dump_modify     img pad 6
+#dump            traj all custom 1000 vesicle.lammpstrj id type x y z mux muy muz
+
+minimize        1.0e-8 1.0e-6 1000 10000
+
+timestep        0.01
+fix             integrate all nve/sphere update dipole
+fix             thermostat all langevin ${T} ${T} 1.0 32147 zero yes omega yes
+fix_modify      thermostat temp Tall
+
+run             10000

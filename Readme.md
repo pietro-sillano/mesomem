@@ -36,61 +36,32 @@ If you use this model or code in your research, please cite the following:
 * **`Analysis/`**: Python scripts to perform analysis from the LAMMPS trajectoy files, in particular for planar systems.
 * **`lammps_file/`**: C++ source files for the membrane potential (`pair_style mesomem`) and custom pressure compute.
 * **`lammps_input_configuration/`**: Python scripts to generate initial configurations (planar, tubes, and spheres).
-* **`systems/`**: LAMMPS input scripts (`.lmp`) and analysis tools for various physical setups:
+* **`examples/`**: Ready-to-run inputs for a flat membrane, a spherical vesicle and self-assembly, using `pair_style mesomem/dipole` from LAMMPS.
+* **`systems/`**: Original research input scripts (`.lmp`, older `pair_style mesomem`) and analysis tools for various physical setups:
 * `planar`: All planar membrane systems.
 * `self_assembly`: Self-assembly simulations from random distributions.
 * `spherical`: Vesicle-related simulations.
 * `volume_control`: Simulations involving osmotic pressure or volume constraints.
 * `wrapping`: Nanoparticle-membrane wrapping studies.
-* **`benchmarks/`**: Scripts for evaluating model performance.
 
 ---
 
 ## How to use the model
-
-### 1. Clone the Repository
-
-```bash
-git clone https://gitlab.tudelft.nl/idema-group/mesomem.git
-```
-
-### 2. LAMMPS Installation
-
-This model requires building a custom version of LAMMPS.
-
-1. **Download LAMMPS:**
-```bash
-wget --no-check-certificate https://download.lammps.org/tars/lammps-stable.tar.gz
-tar -xvf lammps-stable.tar.gz
-```
-
-
-2. **Patch Source Files:** Run the provided setup script to move the MesoMem potential and modified pressure computes into the LAMMPS `src` directory.
-```bash
-cp cpp_files/*.{cpp,h} path_to_lammps/src/
-```
-
-
-3. **Compile:**
-```bash
-cd path_to_lammps/
-mkdir build && cd build
-cmake -D BUILD_MPI=yes -D PKG_BROWNIAN=yes -D PKG_MOLFILE=yes -D PKG_EXTRA-PAIR=yes -D PKG_MOLECULE=yes -D PKG_DIPOLE=yes ../cmake
-make -j8
-make install # optional
-```
-
-
+Now MesoMem is packaged into the latest release of LAMMPS: [MesoMem pair potential](https://docs.lammps.org/pair_mesomem_dipole.html) and ready to use. OpenMP and Kokkos (GPU) accelerated version are available too.
 ---
 
 ## Running a Simulation
 
-You can test the self-assembly of a vesicle using the following command:
+The [`examples/`](examples/) folder has inputs for a flat membrane (`in.planar`), a spherical vesicle (`in.vesicle`) and self-assembly (`in.selfassembly`). Run them from that folder:
 
 ```bash
-mpirun -np 4 lmp -i systems/self_assembly/self_assembly.lmp -v ktilt 12.0 -v ksplay 1.0 -v N 400 -v rcut 2.5 -v wc 2.0 -v zeta 5.0 -v eps 1.0 -v T 0.2
-
+cd examples
+mpirun -np 4 lmp -in in.selfassembly -var ktilt 12.0
 ```
+
+See [`examples/README.md`](examples/README.md) for what each example does and all parameters.
+
+The scripts in `systems/` use the older `pair_style mesomem` from `cpp_files/`, and their parameters are passed on the command line with `-v`.
 
 ### Key Parameters
 
