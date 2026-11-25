@@ -391,3 +391,4 @@ csv/
 img*
 render/
 animation/
+*.DS_Store
