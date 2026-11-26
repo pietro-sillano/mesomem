@@ -27,6 +27,7 @@ adopters:
     status: In progress
     title: "Luthey-Schulten group"
     who: "Zaida (Zan) Luthey-Schulten, Department of Chemistry, University of Illinois Urbana-Champaign"
+    text: "Uses MesoMem for the membrane in the group's whole-cell simulation project."
     links:
       - label: Group website
         url: https://lutheyschulten.web.illinois.edu
@@ -35,6 +36,7 @@ adopters:
     status: In progress
     title: "Ilie group"
     who: "Ioana Ilie, Van 't Hoff Institute for Molecular Sciences, University of Amsterdam"
+    text: "Uses MesoMem to study how membranes wrap patterned particles."
     links:
       - label: Profile
         url: https://www.uva.nl/en/profile/i/l/i.m.ilie/i.m.ilie.html
