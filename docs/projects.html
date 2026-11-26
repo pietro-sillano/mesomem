@@ -4,21 +4,23 @@ nav: projects
 permalink: /projects/
 ---
 <section class="block">
-  <h2 class="label">Projects using MesoMem</h2>
-  {%- if site.data.projects.projects.size > 0 %}
+  <h2 class="label">Adopters</h2>
+  {%- if site.data.projects.adopters.size > 0 %}
   <ul class="rows">
-    {%- for item in site.data.projects.projects %}
+    {%- for item in site.data.projects.adopters %}
     {% include project.html item=item %}
     {%- endfor %}
   </ul>
-  {%- endif %}
   <p class="small">Using MesoMem in your project? Contact us and we will feature it here.</p>
+  {%- else %}
+  <p class="note">Groups and people using MesoMem in their own projects will be featured here. Using MesoMem? Contact us and we will add you.</p>
+  {%- endif %}
 </section>
 
 <section class="block">
-  <h2 class="label">The MesoMem paper</h2>
+  <h2 class="label">Publications</h2>
   <ul class="rows">
-    {%- for item in site.data.projects.paper %}
+    {%- for item in site.data.projects.publications %}
     {% include project.html item=item %}
     {%- endfor %}
   </ul>
