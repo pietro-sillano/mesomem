@@ -1,0 +1,25 @@
+---
+title: Projects
+nav: projects
+permalink: /projects/
+---
+<section class="block">
+  <h2 class="label">Projects using MesoMem</h2>
+  {%- if site.data.projects.projects.size > 0 %}
+  <ul class="rows">
+    {%- for item in site.data.projects.projects %}
+    {% include project.html item=item %}
+    {%- endfor %}
+  </ul>
+  {%- endif %}
+  <p class="small">Using MesoMem in your project? Contact us and we will feature it here.</p>
+</section>
+
+<section class="block">
+  <h2 class="label">The MesoMem paper</h2>
+  <ul class="rows">
+    {%- for item in site.data.projects.paper %}
+    {% include project.html item=item %}
+    {%- endfor %}
+  </ul>
+</section>

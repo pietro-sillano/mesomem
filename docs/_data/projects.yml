@@ -1,0 +1,38 @@
+# Projects page.
+#
+# `paper` holds the MesoMem reference paper. `projects` holds work that uses MesoMem:
+# ongoing projects, collaborations, preprints and papers. Newest first.
+#
+# Each entry:
+#   - year: 2027
+#     status: In progress    # In progress, Preprint, Paper, Thesis, ...
+#     title: "What the project is about"
+#     who: "A. Person, B. Person (Group, University)"
+#     text: "One sentence on how MesoMem is used, in Markdown."   # optional
+#     links:                                                       # optional
+#       - label: arXiv
+#         url: https://arxiv.org/abs/...
+#
+# When a project gets published, change its status and add the link.
+
+paper:
+  - year: 2026
+    status: Paper
+    title: "MesoMem: A mesoscale membrane model based on an additive potential"
+    who: "P. Sillano, S. J. Marrink, T. Idema"
+    text: "*Phys. Rev. E* **114**, 034412."
+    links:
+      - label: Paper
+        url: https://doi.org/10.1103/4dhv-8xd7
+      - label: arXiv
+        url: https://arxiv.org/abs/2602.24123
+
+projects:
+  - year: 2026
+    status: Preprint
+    title: "Membrane particle wrapping across methods and shapes"
+    who: "P. Sillano, H. Sun, B. Y. Cinemre, T. Idema"
+    text: "Compares MesoMem with a shape-equation solver and a triangulated surface model (FreeDTS) for the wrapping of spherical and non-spherical particles by membranes."
+    links:
+      - label: arXiv
+        url: https://arxiv.org/abs/2611.03310

@@ -1,26 +1,17 @@
 ---
-title: Publications
-nav: publications
+layout: null
 permalink: /publications/
+sitemap: false
 ---
-<section class="block">
-  <h2 class="label">The MesoMem paper</h2>
-  <ul class="rows">
-    {%- for pub in site.data.publications.mesomem %}
-    {% include publication.html pub=pub %}
-    {%- endfor %}
-  </ul>
-</section>
-
-<section class="block">
-  <h2 class="label">Work using MesoMem</h2>
-  {%- if site.data.publications.using.size > 0 %}
-  <ul class="rows">
-    {%- for pub in site.data.publications.using %}
-    {% include publication.html pub=pub %}
-    {%- endfor %}
-  </ul>
-  {%- else %}
-  <p class="note">Papers, preprints and theses that use the model will be listed here. Used MesoMem in your work? Contact us and we will add it here!</p>
-  {%- endif %}
-</section>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Moved to Projects · MesoMem</title>
+  <link rel="canonical" href="{{ '/projects/' | absolute_url }}">
+  <meta http-equiv="refresh" content="0; url={{ '/projects/' | relative_url }}">
+</head>
+<body>
+  <p>This page moved to <a href="{{ '/projects/' | relative_url }}">Projects</a>.</p>
+</body>
+</html>

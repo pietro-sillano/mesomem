@@ -6,6 +6,10 @@
 #     text: "One sentence in Markdown. [Link text](https://example.org)"
 
 - date: "Nov 2026"
+  type: Preprint
+  text: "New preprint using MesoMem: *Membrane particle wrapping across methods and shapes*. [arXiv:2611.03310](https://arxiv.org/abs/2611.03310)"
+
+- date: "Nov 2026"
   type: Release
   text: "MesoMem is part of LAMMPS as `pair_style mesomem/dipole`, with OpenMP and Kokkos versions. [Docs](https://docs.lammps.org/pair_mesomem_dipole.html)"
 

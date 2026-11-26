@@ -168,6 +168,7 @@ main {
 .tag { font-size: 12px; font-weight: 500; color: var(--ink-3); }
 .tag-release { color: #0b5555; }
 .tag-paper, .tag-preprint { color: #8a4510; }
+.tag-in-progress { color: #3d4f8a; }
 
 .pub-title { font-weight: 500; }
 

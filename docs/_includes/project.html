@@ -1,0 +1,4 @@
+<li class="row">
+  <span class="row-meta"><span class="date">{{ include.item.year }}</span><span class="tag tag-{{ include.item.status | downcase | replace: ' ', '-' }}">{{ include.item.status }}</span></span>
+  <span class="row-body"><span class="pub-title">{{ include.item.title }}.</span> {{ include.item.who }}.{% if include.item.text %} {{ include.item.text | markdownify | remove: '<p>' | remove: '</p>' | strip }}{% endif %}{% for link in include.item.links %}{% if forloop.first %} {% else %} · {% endif %}<a href="{{ link.url }}">{{ link.label }}</a>{% endfor %}</span>
+</li>
