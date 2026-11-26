@@ -22,7 +22,14 @@
 #
 # When a preprint is published, change its status to Paper and add the journal link.
 
-adopters: []
+adopters:
+  - year: 2026
+    status: In progress
+    title: "Ilie group"
+    who: "Ioana Ilie, Van 't Hoff Institute for Molecular Sciences, University of Amsterdam"
+    links:
+      - label: Profile
+        url: https://www.uva.nl/en/profile/i/l/i.m.ilie/i.m.ilie.html
 
 publications:
   - year: 2026
